@@ -20,7 +20,7 @@ class SaveError(Exception):
 
 
 def new_save(name: str, hero: str) -> dict:
-    from prompts import OPENING_STATE
+    from prompts import OPENING_STATE, OPENING_SLIDE
     now = datetime.now().isoformat(timespec="seconds")
     return {
         "version": SAVE_VERSION,
@@ -33,6 +33,7 @@ def new_save(name: str, hero: str) -> dict:
         "summary": OPENING_STATE["summary"],
         "history": [],
         "dice_log": [],
+        "stage": [copy.deepcopy(OPENING_SLIDE)],
         "provider": {},
     }
 
@@ -163,7 +164,10 @@ def apply_delta(save: dict, delta: dict) -> dict:
             note = str(u.get("note") or "").strip()
             if note:
                 npc.setdefault("notes", []).append(note)
-                del npc["notes"][:-5]  # 每个 NPC 只留最近5条
+                del npc["notes"][:-8]  # 每个 NPC 只留最近8条(重逢记忆)
+            # NPC 常驻: 记录本次见面时间与累计次数 (规划.md §7)
+            npc["last_met"] = {"day": state["day"], "period": state["period"]}
+            npc["met_count"] = int(npc.get("met_count", 0)) + 1
             changes["npcs"].append(name)
 
     for it in _as_str_list(delta.get("items_add")):
@@ -179,7 +183,7 @@ def apply_delta(save: dict, delta: dict) -> dict:
 
 
 def record_turn(save: dict, player: str, dice: dict, narrative: str,
-                suggestions: list[str], old_time: str) -> None:
+                suggestions: list[str], old_time: str, slides: list | None = None) -> None:
     save["turn"] = save.get("turn", 0) + 1
     save["history"].append({
         "turn": save["turn"],
@@ -188,6 +192,7 @@ def record_turn(save: dict, player: str, dice: dict, narrative: str,
         "player": player,
         "dice": dice.get("roll"),
         "narrative": narrative,
+        "slides": slides or [],
         "suggestions": suggestions,
     })
     save.setdefault("dice_log", []).append(

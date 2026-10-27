@@ -211,11 +211,56 @@ def main_menu(ui: UI, cfg: dict):
             return
 
 
+# ---------- 网页模式 (M1 基座, 规划.md) ----------
+
+def run_server(args, ui: UI, cfg: dict):
+    import server as webserver
+    from webui import CollectingUI
+
+    if args.new:
+        save = st.new_save(args.new, args.hero)
+        st.save_game(save)
+    elif args.save:
+        try:
+            save = st.load_save(args.save)
+        except st.SaveError as e:
+            ui.error(str(e))
+            sys.exit(1)
+    else:
+        saves = st.list_saves()
+        if saves:
+            save = st.load_save(saves[0]["name"])
+            ui.info(f"未指定存档，已载入最近的「{save['name']}」（--save/--new 可指定）。")
+        else:
+            save = st.new_save("新的旅程", args.hero)
+            st.save_game(save)
+            ui.info("没有找到存档，已新建「新的旅程」。")
+
+    try:
+        httpd = webserver.serve(engine.Game(save, cfg, CollectingUI()), args.host, args.port)
+    except OSError as e:
+        ui.error(f"服务启动失败（端口被占用？{e}）")
+        sys.exit(1)
+    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
+    ui.success(f"网页模式已启动：http://{shown_host}:{args.port}   （Ctrl+C 退出并自动存档）")
+    if args.host == "0.0.0.0":
+        ui.muted("已监听全部网卡，同一局域网的设备可用本机 IP 访问。")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        st.save_game(save)
+        ui.info("\n已存档，服务关闭。")
+
+
 # ---------- 入口 ----------
 
 def main():
     ap = argparse.ArgumentParser(description=GAME_TITLE)
     ap.add_argument("cmd", nargs="?", choices=["config"], help="config = 重新配置 API")
+    ap.add_argument("--server", action="store_true",
+                    help="网页模式: 本机起 HTTP 服务, 浏览器打开即玩 (字画幻灯片)")
+    ap.add_argument("--host", default="127.0.0.1", help="网页模式监听地址 (联机用 0.0.0.0)")
+    ap.add_argument("--port", type=int, default=8770, help="网页模式端口")
     ap.add_argument("--save", metavar="存档名", help="直接继续指定存档")
     ap.add_argument("--new", metavar="存档名", help="直接新建指定存档")
     ap.add_argument("--hero", metavar="主角名", default="勇者")
@@ -227,8 +272,12 @@ def main():
 
     if args.cmd == "config" or cfg is None:
         cfg = run_wizard(ui)
-        if args.cmd == "config" and not args.save and not args.new:
+        if args.cmd == "config" and not args.server and not args.save and not args.new:
             return
+
+    if args.server:
+        run_server(args, ui, cfg)
+        return
 
     if args.new:
         save = st.new_save(args.new, args.hero)

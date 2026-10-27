@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>完全开放式RPG · 字画</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>完全开放式RPG</h1>
+    <div id="meta"></div>
+  </div>
+  <nav>
+    <button id="btn-ledger" type="button">账本</button>
+    <button id="btn-history" type="button">历史</button>
+  </nav>
+</header>
+
+<main>
+  <section id="stage-wrap">
+    <div id="stage" title="点击翻页"></div>
+    <div id="slide-dots" aria-hidden="true"></div>
+    <div id="slide-caption"></div>
+  </section>
+
+  <section id="story">
+    <div id="narrative"></div>
+    <div id="events"></div>
+    <div id="suggestions" aria-label="下一步建议"></div>
+  </section>
+</main>
+
+<footer>
+  <div id="busy" hidden>世界正在推演……</div>
+  <form id="input-form">
+    <input id="input" autocomplete="off" placeholder="输入你的行动……（/help 查看命令）">
+    <button type="submit">行动</button>
+  </form>
+</footer>
+
+<aside id="history" class="panel" hidden>
+  <h2>最近剧情 <button type="button" class="close">×</button></h2>
+  <div id="history-list"></div>
+</aside>
+
+<script src="/static/slides.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

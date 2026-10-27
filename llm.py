@@ -9,6 +9,8 @@ import os
 
 import httpx
 
+from prompts import canvas
+
 TIMEOUT = httpx.Timeout(20.0, read=300.0)
 UA = {"User-Agent": "open-rpg-terminal/0.1"}
 
@@ -68,18 +70,48 @@ class _Mock:
             action = user.split("【玩家行动】", 1)[1].split("\n", 1)[0]
         p = self.PERIOD_FLOW[(self.calls - 1) % 5]
         days = 3 if "三天后" in action else 0
+        col = 2 + ((self.calls - 1) % 3) * 2  # 「我」每回合向右挪 2 格, 验证平滑切换
+        slide_move = {
+            "caption": "北上赶路", "tone": "灰",
+            "canvas": canvas(
+                "",
+                "　山　　　山　　山",
+                "　　丶　　　　丶",
+                "",
+                "",
+                "　" * col + "我",
+            ),
+        }
+        slide_chest = {
+            "caption": "发现铜哨", "tone": "暖",
+            "canvas": canvas(
+                "",
+                "",
+                "　　　┌──┐",
+                "　　　│宝箱│",
+                "　　　└──┘",
+                "　我",
+            ),
+        }
         import json as _j
+        # NPC 常驻演示: 奇数回合遇见信使(写账本), 偶数回合不更新——
+        # 若偶数回合恰逢"三天后", 下回合的账本里信使就会显示"距今3天", 演练重逢注入
+        met = self.calls % 2 == 1
+        upserts = [{"name": "神秘信使", "status": "快马北去", "relation": "陌生",
+                    "location": "北方官道", "note": f"第{self.calls}次出现"}] if met else []
+        aside = ("那名神秘信使竟已在茶棚等候多时——他说北边的界碑又烧了一处。"
+                 if met else "茶棚里只有往来的行脚商人，没有熟面孔。")
         return _j.dumps({
             "narrative": f"【Mock 测试剧情 #{self.calls}】世界回应了你的行动：「{action[:60]}」。"
-                         f"远处的山道上扬起尘土，一名信使快马而过，留下一句没头没尾的话：北边的界碑又烧了。"
+                         f"远处的山道上扬起尘土，{aside}"
                          + (f"你日夜兼程三天，" if days else "时间流逝，") + f"转眼到了{p}。",
+            "slides": [slide_move, slide_chest],
             "time_advance": {"days": days, "period": p},
             "state_updates": {
-                "facts_add": [f"测试事实#{self.calls}：信使再传北境警讯"],
+                "facts_add": [f"测试事实#{self.calls}：北境警讯再传"],
                 "facts_remove": [],
-                "npc_upserts": [{"name": "神秘信使", "status": "快马北去", "relation": "陌生",
-                                 "location": "北方官道", "note": f"第{self.calls}次出现"}],
-                "items_add": [f"信使掉落的铜哨#{self.calls}"],
+                "npc_upserts": upserts,
+                "items_add": [f"信使掉落的铜哨#{self.calls}"] if met else [],
                 "location": "官道旁的茶棚",
             },
             "summary": f"（摘要更新到第{self.calls}回合）主角一路北上，途中屡遇北境警讯，神秘信使反复出现。",

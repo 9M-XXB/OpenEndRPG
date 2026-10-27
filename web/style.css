@@ -1,0 +1,140 @@
+/* 完全开放式RPG · 网页版样式 (M2, 规划.md)
+   tone 色板属"框架样式"; 不含任何图像/图标资源。 */
+:root {
+  --paper: #f6f1e6;
+  --ink: #33312b;
+  --dim: #8a8577;
+  --line: #d9d2c0;
+  --accent: #8a5a2b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ---------- 头部 ---------- */
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 18px; border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 17px; margin: 0; letter-spacing: 2px; }
+#meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
+header nav button {
+  margin-left: 8px; padding: 5px 12px; font: inherit; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 999px; background: none; cursor: pointer;
+}
+header nav button:hover { background: #eee7d6; }
+
+/* ---------- 主区 ---------- */
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 46%) 1fr;
+  gap: 22px;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+}
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+
+/* ---------- 字画舞台 ---------- */
+#stage-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#stage {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, .05);
+  transition: background .6s ease, color .6s ease;
+}
+/* tone 色板 (LLM 只能给枚举值, 色值是前端框架样式) */
+#stage[data-tone="暗"] { background: #262a33; color: #e8e4d6; }
+#stage[data-tone="明"] { background: #f7f3e8; color: #33322e; }
+#stage[data-tone="暖"] { background: #f2e3c8; color: #5c3a1e; }
+#stage[data-tone="冷"] { background: #dfe7ee; color: #22384c; }
+#stage[data-tone="灰"] { background: #e8e8e6; color: #3b3b3a; }
+
+.glyph {
+  position: absolute;
+  left: 0; top: 0;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+  transition: transform .65s cubic-bezier(.4, 0, .2, 1),
+              opacity .45s ease,
+              font-size .65s ease;
+}
+.glyph.in { opacity: 0; }
+.glyph.out { opacity: 0 !important; }
+#stage.snap .glyph { transition: none !important; }
+
+#slide-dots { display: flex; gap: 6px; height: 8px; }
+#slide-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: #00000022; }
+#slide-dots .dot.on { background: var(--accent); }
+#slide-caption { min-height: 18px; font-size: 13px; color: var(--dim); letter-spacing: 1px; }
+
+/* ---------- 叙事 ---------- */
+#story { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#narrative {
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 1.9;
+  min-height: 200px;
+}
+#events .ev { font-size: 12.5px; color: var(--dim); margin-top: 4px; }
+#events .ev-error { color: #a33; }
+#events .ev-warn { color: #8a6a1e; }
+#events .ev-dice, #events .ev-header { color: var(--accent); }
+
+#suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+#suggestions .chip {
+  font: inherit; font-size: 13px; padding: 6px 13px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: none; cursor: pointer; color: var(--ink);
+}
+#suggestions .chip:hover { background: #eee7d6; border-color: var(--accent); }
+
+/* ---------- 底部输入 ---------- */
+footer { border-top: 1px solid var(--line); padding: 12px 18px 16px; }
+#busy { font-size: 12.5px; color: var(--dim); margin-bottom: 6px; animation: breathe 1.6s ease infinite; }
+@keyframes breathe { 50% { opacity: .35; } }
+#input-form { display: flex; gap: 10px; width: min(1040px, 100%); margin: 0 auto; }
+#input {
+  flex: 1; font: inherit; font-size: 15px; padding: 9px 14px;
+  border: 1px solid var(--line); border-radius: 6px; background: #fffdf7; color: var(--ink);
+}
+#input:focus { outline: 1px solid var(--accent); }
+#input-form button {
+  font: inherit; padding: 9px 22px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+}
+#input-form button:disabled { opacity: .5; cursor: default; }
+
+/* ---------- 面板 ---------- */
+.panel {
+  position: fixed; right: 16px; top: 60px; bottom: 90px;
+  width: min(430px, 92vw);
+  background: #fffdf6; border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; overflow: auto; box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  z-index: 20;
+}
+.panel h2 { font-size: 14px; margin: 0 0 10px; display: flex; justify-content: space-between; }
+.panel .close { border: none; background: none; font-size: 16px; cursor: pointer; color: var(--dim); }
+.panel .h-item { margin-bottom: 12px; }
+.panel .h-item b { font-size: 13px; }
+.panel .h-item p { margin: 4px 0 0; font-size: 12.5px; color: #55524a; line-height: 1.7; }
+
+/* ---------- 动效降级 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .glyph, #stage { transition: none !important; }
+  #busy { animation: none; }
+}

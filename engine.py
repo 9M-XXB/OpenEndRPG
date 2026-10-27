@@ -79,11 +79,16 @@ class Game:
         old_time, _ = st.advance_time(self.save["state"], obj["time_advance"]["days"],
                                       str(obj["time_advance"].get("period", "")))
         changes = st.apply_delta(self.save, obj["state_updates"])
+        # 字画幻灯片: 展示元数据, 只做宽松钳位(画面失败不使回合失败), 不进世界账本
+        slides = obj.get("slides")
+        slides = [x for x in slides if isinstance(x, dict)][:3] if isinstance(slides, list) else []
+        if slides:
+            self.save["stage"] = slides
         save_summary = str(obj.get("summary", "")).strip()
         if save_summary:
             self.save["summary"] = save_summary
         st.record_turn(self.save, player_input, dice, obj["narrative"],
-                       [str(x) for x in obj.get("suggestions", [])], old_time)
+                       [str(x) for x in obj.get("suggestions", [])], old_time, slides)
         self.save["provider"] = {"provider": self.cfg.get("provider", ""), "model": self.cfg.get("model", "")}
         st.save_game(self.save)
 
@@ -143,9 +148,12 @@ class Game:
             self.ui.info(f"  · {f}")
         self.ui.info("人物:")
         for name, n in s.get("npcs", {}).items():
+            lm = n.get("last_met") or {}
             self.ui.info(f"  · {name} — {n.get('status','')}"
                          + (f"（{n['relation']}）" if n.get("relation") else "")
-                         + (f"［{n['location']}］" if n.get("location") else ""))
+                         + (f"［{n['location']}］" if n.get("location") else "")
+                         + (f"（上次见面 第{lm['day']}天·{lm.get('period','')}"
+                            f"，见过{n.get('met_count', 1)}次）" if lm else ""))
         self.ui.info("物品: " + ("、".join(s["items"]) if s["items"] else "（空）"))
         self.ui.muted("剧情摘要: " + (self.save.get("summary") or "（无）"))
 
