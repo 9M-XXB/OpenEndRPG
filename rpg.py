@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""完全开放式RPG · 终端文字冒险（原型 v0.1）
+"""完全开放式RPG（原型 v0.2）
 用法:
-  python3 rpg.py               # 菜单（首次自动进入 API 配置向导）
-  python3 rpg.py config        # 重新配置 API
-  python3 rpg.py --new 存档名   # 直接新建开局
-  python3 rpg.py --save 存档名  # 直接继续存档
-  python3 rpg.py --plain       # 纯文本渲染（不用 rich）
-本项目由 ZCode (GLM-5.3-Flash) 编写; 设计依据见 ../调研笔记.md。
+  python3 rpg.py               # 网页模式（默认）: 起本地服务, 浏览器打开即玩（含字画幻灯片）
+  python3 rpg.py --new 存档名   # 网页模式, 直接新建开局
+  python3 rpg.py --save 存档名  # 网页模式, 直接继续存档
+  python3 rpg.py config        # 重新配置 API（key 密码式输入, 不回显）
+  python3 rpg.py --terminal    # 终端模式: 主菜单 + 命令行对话
+  python3 rpg.py --terminal --plain   # 终端纯文本渲染（不用 rich）
+本项目由 ZCode (GLM-5.3-Flash) 编写; 设计依据见 ../调研笔记.md 与 ../规划.md。
 """
 
 import argparse
+import getpass
 import json
 import os
 import sys
@@ -51,10 +53,13 @@ def save_config(cfg: dict):
 # ---------- 配置向导 (F1) ----------
 
 def _ask(ui: UI, label: str, default: str = "", secret: bool = False) -> str:
-    tail = f"（回车 = {default}）" if default else ("（可留空）" if not secret else "")
+    tail = f"（回车 = {default}）" if default else ("（可留空）" if not secret else "（输入不回显, 密码式）")
     ui.info(f"{label}{tail}")
     try:
-        val = input("  > ").strip()
+        if secret:
+            val = getpass.getpass("  > ").strip()  # 不回显, 防偷窥/防入终端历史
+        else:
+            val = input("  > ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         sys.exit(0)
@@ -211,45 +216,65 @@ def main_menu(ui: UI, cfg: dict):
             return
 
 
-# ---------- 网页模式 (M1 基座, 规划.md) ----------
+# ---------- 网页模式 (默认模式; M1 基座, 规划.md) ----------
+
+def _pick_port(host: str, preferred: int) -> int:
+    """首选端口被占用时自动改用系统分配的空闲端口; preferred=0 表示总是随机"""
+    import socket
+    if preferred != 0:
+        s = socket.socket()
+        try:
+            s.bind((host or "127.0.0.1", preferred))
+            s.close()
+            return preferred
+        except OSError:
+            s.close()
+    s = socket.socket()
+    s.bind((host or "127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
 
 def run_server(args, ui: UI, cfg: dict):
     import server as webserver
     from webui import CollectingUI
 
+    game = None
     if args.new:
         save = st.new_save(args.new, args.hero)
         st.save_game(save)
+        game = engine.Game(save, cfg, CollectingUI())
     elif args.save:
         try:
             save = st.load_save(args.save)
         except st.SaveError as e:
             ui.error(str(e))
             sys.exit(1)
-    else:
-        saves = st.list_saves()
-        if saves:
-            save = st.load_save(saves[0]["name"])
-            ui.info(f"未指定存档，已载入最近的「{save['name']}」（--save/--new 可指定）。")
-        else:
-            save = st.new_save("新的旅程", args.hero)
-            st.save_game(save)
-            ui.info("没有找到存档，已新建「新的旅程」。")
+        game = engine.Game(save, cfg, CollectingUI())
 
+    port = _pick_port(args.host, args.port)
+    if port != args.port:
+        ui.info(f"端口 {args.port} 被占用，已自动改用空闲端口 {port}。")
     try:
-        httpd = webserver.serve(engine.Game(save, cfg, CollectingUI()), args.host, args.port)
+        httpd = webserver.serve(cfg, game=game, host=args.host, port=port)
     except OSError as e:
-        ui.error(f"服务启动失败（端口被占用？{e}）")
+        ui.error(f"服务启动失败（{e}）")
         sys.exit(1)
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
-    ui.success(f"网页模式已启动：http://{shown_host}:{args.port}   （Ctrl+C 退出并自动存档）")
+    ui.success(f"网页模式已启动：http://{shown_host}:{port}   （Ctrl+C 退出并自动存档）")
+    if game is None:
+        ui.info("启动到大厅页：在浏览器中新建存档、选择存档、配置 API 或退出。")
     if args.host == "0.0.0.0":
         ui.muted("已监听全部网卡，同一局域网的设备可用本机 IP 访问。")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        st.save_game(save)
-        ui.info("\n已存档，服务关闭。")
+        pass
+    game = getattr(httpd.gameserver, "game", None)
+    if game is not None:
+        st.save_game(game.save)
+    ui.info("服务已关闭。")
 
 
 # ---------- 入口 ----------
@@ -257,42 +282,49 @@ def run_server(args, ui: UI, cfg: dict):
 def main():
     ap = argparse.ArgumentParser(description=GAME_TITLE)
     ap.add_argument("cmd", nargs="?", choices=["config"], help="config = 重新配置 API")
-    ap.add_argument("--server", action="store_true",
-                    help="网页模式: 本机起 HTTP 服务, 浏览器打开即玩 (字画幻灯片)")
-    ap.add_argument("--host", default="127.0.0.1", help="网页模式监听地址 (联机用 0.0.0.0)")
-    ap.add_argument("--port", type=int, default=8770, help="网页模式端口")
+    ap.add_argument("--terminal", action="store_true",
+                    help="终端对话模式（不加分隔即为网页模式）")
+    ap.add_argument("--server", action="store_true", help=argparse.SUPPRESS)  # 兼容旧用法: 网页模式本已是默认
+    ap.add_argument("--host", default="127.0.0.1", help="网页模式监听地址 (局域网联机用 0.0.0.0)")
+    ap.add_argument("--port", type=int, default=8770,
+                    help="网页模式首选端口; 被占用时自动改用空闲端口, 0 = 总是随机")
     ap.add_argument("--save", metavar="存档名", help="直接继续指定存档")
     ap.add_argument("--new", metavar="存档名", help="直接新建指定存档")
     ap.add_argument("--hero", metavar="主角名", default="勇者")
-    ap.add_argument("--plain", action="store_true", help="纯文本渲染")
+    ap.add_argument("--plain", action="store_true", help="（仅终端模式）纯文本渲染")
     args = ap.parse_args()
 
     ui = UI(plain=args.plain)
     cfg = load_config()
 
-    if args.cmd == "config" or cfg is None:
-        cfg = run_wizard(ui)
-        if args.cmd == "config" and not args.server and not args.save and not args.new:
+    if args.terminal:  # 终端模式: 菜单/命令行对话
+        if args.cmd == "config" or cfg is None:
+            cfg = run_wizard(ui)
+            if args.cmd == "config" and not args.save and not args.new:
+                return
+        if args.new:
+            save = st.new_save(args.new, args.hero)
+            st.save_game(save)
+            engine.Game(save, cfg, ui).run()
             return
-
-    if args.server:
-        run_server(args, ui, cfg)
+        if args.save:
+            try:
+                save = st.load_save(args.save)
+            except st.SaveError as e:
+                ui.error(str(e))
+                sys.exit(1)
+            engine.Game(save, cfg, ui).run()
+            return
+        main_menu(ui, cfg)
         return
 
-    if args.new:
-        save = st.new_save(args.new, args.hero)
-        st.save_game(save)
-        engine.Game(save, cfg, ui).run()
-        return
-    if args.save:
-        try:
-            save = st.load_save(args.save)
-        except st.SaveError as e:
-            ui.error(str(e))
-            sys.exit(1)
-        engine.Game(save, cfg, ui).run()
-        return
-    main_menu(ui, cfg)
+    # 默认: 网页模式
+    if args.cmd == "config" or cfg is None:
+        run_wizard(ui)
+        if args.cmd == "config":
+            return
+        cfg = load_config()
+    run_server(args, ui, cfg)
 
 
 if __name__ == "__main__":

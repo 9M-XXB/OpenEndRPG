@@ -42,14 +42,22 @@
     var timer = null;
     var dwell = 5200; // PPT 自动翻页间隔
 
-    container.style.aspectRatio = W + " / " + H;
+    container.style.aspectRatio = opts.aspect || (W + " / " + H);
     container.setAttribute("data-tone", "灰");
     container.addEventListener("click", function () { next(); });
-    window.addEventListener("resize", function () {
+
+    // 尺寸变化(含首帧布局未稳)时重排布点: 布点必须以真实渲染尺寸为准
+    function replant() {
+      if (!spans.length) return;
       container.classList.add("snap");
       spans.forEach(function (sp) { place(sp, sp.col, sp.row); });
       requestAnimationFrame(function () { container.classList.remove("snap"); });
-    });
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(replant).observe(container);
+    } else {
+      window.addEventListener("resize", replant);
+    }
 
     function cellSize() {
       return { w: container.clientWidth / W, h: container.clientHeight / H };
@@ -57,8 +65,8 @@
 
     // 远近分层: 上 2 行远景小字, 中间中景, 下 2 行近景大字 (布局规则属"框架", 非图像元素)
     function tierSize(row) {
-      var t = row < 2 ? 0.58 : (row < 4 ? 0.78 : 1.0);
-      return cellSize().w * t * 0.92;
+      var t = row < 2 ? 0.7 : (row < 4 ? 0.9 : 1.08);
+      return cellSize().w * t * 0.95;
     }
 
     function place(sp, col, row) {
@@ -155,12 +163,18 @@
       spans = nextSpans;
 
       container.setAttribute("data-tone", TONES.indexOf(slide.tone) >= 0 ? slide.tone : TONES[0]);
-      if (instant) requestAnimationFrame(function () { container.classList.remove("snap"); });
+      if (instant) {
+        requestAnimationFrame(function () { container.classList.remove("snap"); });
+        // 首帧布局未稳时的兜底重排(布局定型后再布点一次)
+        requestAnimationFrame(function () {
+          requestAnimationFrame(replant);
+        });
+      }
     }
 
     function fire() {
       var s = slides[cur];
-      onSlide(cur, slides.length, s ? s.caption : "");
+      onSlide(cur, slides.length, s ? s.caption : "", s ? s.tone : "");
     }
 
     function step() {

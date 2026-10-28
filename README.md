@@ -21,13 +21,18 @@
 ```bash
 git clone https://github.com/9M-XXB/OpenEndRPG.git
 cd OpenEndRPG
-python3 rpg.py          # 终端模式：首次运行自动进入 API 配置向导
-python3 rpg.py --server # 网页模式：浏览器打开 http://127.0.0.1:8770 即玩（含字画幻灯片）
+python3 rpg.py             # 网页模式（默认）: 启动到大厅页, 浏览器打开即玩
+python3 rpg.py --terminal  # 终端模式: 主菜单 + 命令行对话
+python3 rpg.py config      # 重新配置 API（key 为密码式输入, 不回显）
 ```
 
-依赖：Python 3.10+ 与 `httpx`（`pip install httpx`；可选 `pip install rich` 获得更好的排版，缺失时自动降级为纯文本）。网页服务与前端只用 Python 标准库与原生 HTML/CSS/JS，无需安装浏览器端任何东西。
+依赖：Python 3.10+ 与 `httpx`（`pip install httpx`；可选 `pip install rich` 供终端模式使用，缺失时自动降级为纯文本）。网页服务与前端只用 Python 标准库与原生 HTML/CSS/JS，无需安装浏览器端任何东西。
 
-`--server` 常用参数：`--new 存档名` / `--save 存档名`（缺省自动载入最近存档或新建）、`--port`、`--host 0.0.0.0`（允许同局域网设备访问）。
+**大厅页**：启动后先进入大厅——新建存档、存档选择（进入/删除）、配置 API、退出（存档并关闭服务），选择存档后才进入游戏；不再自动载入任何存档。配置 API 支持在网页内完成全部向导步骤：选服务商 → 填 key（密码式）→ 拉取模型列表 → 测试对话 → 保存。
+
+- **端口不固定**：默认首选 8770，被占用时自动改用系统分配的空闲端口；`--port 0` 表示总是随机。
+- **跳过大厅**：`--new 存档名` / `--save 存档名` 可直接进入指定存档。
+- **局域网**：`--host 0.0.0.0` 允许同一局域网设备访问。
 
 ## 支持的 API（14 预设 × 3 类协议，零 SDK 依赖）
 
@@ -38,7 +43,7 @@ python3 rpg.py --server # 网页模式：浏览器打开 http://127.0.0.1:8770 �
 | Google | Gemini |
 | 离线 | Mock（免 key，脚本化剧情，用于测试与演示） |
 
-首次运行向导：选服务商 → base_url（回车用默认）→ API key → 模型（自动在线拉取列表选择）→ 测试对话 → 保存到 `config.json`。随时 `python3 rpg.py config` 重新配置。
+首次运行向导：选服务商 → base_url（回车用默认）→ API key（**密码式输入，不回显**）→ 模型（自动在线拉取列表选择）→ 测试对话 → 保存到 `config.json`。随时 `python3 rpg.py config` 重新配置。
 
 > **隐私**：API key 只保存在本机 `config.json`（已被 `.gitignore` 排除）；`config.example.json` 是字段模板。
 

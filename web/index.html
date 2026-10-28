@@ -6,11 +6,11 @@
 <title>完全开放式RPG · 字画</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="lobby">
 <header>
   <div class="brand">
     <h1>完全开放式RPG</h1>
-    <div id="meta"></div>
+    <div id="meta">启动到大厅……</div>
   </div>
   <nav>
     <button id="btn-ledger" type="button">账本</button>
@@ -19,6 +19,38 @@
 </header>
 
 <main>
+  <!-- 大厅: 新建存档 / 存档选择 / 删除存档 / 配置 API / 退出 -->
+  <section id="lobby">
+    <h1>完全开放式RPG</h1>
+    <p class="lobby-sub">一个"只提供开头"的文字冒险——任务、NPC、画面，其余一切由 LLM 即时生成</p>
+
+    <div class="lobby-card">
+      <div class="card-title">API</div>
+      <div class="row">
+        <span id="cfg-line" class="grow">未配置</span>
+        <button id="btn-config" type="button" class="mini">配置 API</button>
+      </div>
+      <div id="lobby-msg" class="ev"></div>
+    </div>
+
+    <form id="new-form" class="lobby-card">
+      <div class="card-title">新建存档</div>
+      <input id="new-name" placeholder="存档名" required>
+      <input id="new-hero" placeholder="主角名（默认：勇者）">
+      <button type="submit" class="primary">创建并进入</button>
+    </form>
+
+    <div class="lobby-card">
+      <div class="card-title">存档选择</div>
+      <div id="save-list"></div>
+    </div>
+
+    <div class="lobby-foot">
+      <button id="btn-exit" type="button" class="mini danger">退出（存档并关闭服务）</button>
+    </div>
+  </section>
+
+  <!-- 游戏 -->
   <section id="stage-wrap">
     <div id="stage" title="点击翻页"></div>
     <div id="slide-dots" aria-hidden="true"></div>
@@ -26,7 +58,15 @@
   </section>
 
   <section id="story">
-    <div id="narrative"></div>
+    <div id="story-viewport" title="左右滑动或用 ◀ ▶ 翻页">
+      <div id="story-track"></div>
+    </div>
+    <div id="story-pager">
+      <button id="pg-prev" type="button" aria-label="上一页">◀</button>
+      <div id="pg-dots" aria-hidden="true"></div>
+      <button id="pg-next" type="button" aria-label="下一页">▶</button>
+      <span id="pg-label"></span>
+    </div>
     <div id="events"></div>
     <div id="suggestions" aria-label="下一步建议"></div>
   </section>
@@ -40,8 +80,38 @@
   </form>
 </footer>
 
+<!-- 配置 API 弹窗 -->
+<aside id="config-panel" class="panel" hidden>
+  <h2>配置 API <button type="button" class="close" aria-label="关闭">×</button></h2>
+  <label>服务商
+    <select id="cfg-provider"></select>
+  </label>
+  <label>base_url
+    <input id="cfg-base" placeholder="以 /v1 结尾（留空用预设）">
+  </label>
+  <label>API key
+    <input id="cfg-key" type="password" placeholder="密码式输入, 只存本机">
+  </label>
+  <label>模型
+    <input id="cfg-model" placeholder="模型名">
+    <button id="btn-models" type="button" class="mini">拉取模型列表</button>
+    <select id="cfg-models" hidden></select>
+  </label>
+  <div class="cfg-actions">
+    <button id="btn-test" type="button" class="mini">测试对话</button>
+    <button id="btn-save-cfg" type="button" class="mini primary">保存</button>
+  </div>
+  <div id="cfg-msg" class="ev"></div>
+</aside>
+
+<!-- 账本 / 历史 弹窗 -->
+<aside id="ledger" class="panel" hidden>
+  <h2>世界账本 <button type="button" class="close" aria-label="关闭">×</button></h2>
+  <div id="ledger-list"></div>
+</aside>
+
 <aside id="history" class="panel" hidden>
-  <h2>最近剧情 <button type="button" class="close">×</button></h2>
+  <h2>最近剧情 <button type="button" class="close" aria-label="关闭">×</button></h2>
   <div id="history-list"></div>
 </aside>
 
