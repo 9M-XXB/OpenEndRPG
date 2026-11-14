@@ -51,7 +51,8 @@ def _public_config(cfg: dict) -> dict:
 
 
 def _providers_public() -> list[dict]:
-    return [{"id": p["id"], "name": p["name"], "protocol": p["protocol"],
+    return [{"id": p["id"], "name": p["name"], "name_en": p.get("name_en", p["name"]),
+             "protocol": p["protocol"],
              "base_url": p.get("base_url", ""), "need_key": p.get("key", False),
              "default_model": p.get("model", "")} for p in llm.PROVIDERS]
 
@@ -86,6 +87,10 @@ class GameServer:
         self.lock = threading.Lock()
         self.on_shutdown = on_shutdown
 
+    def _t(self, zh: str, en: str) -> str:
+        """按全局界面语言返回 API 消息文案"""
+        return en if self.cfg.get("language") == "en" else zh
+
     # ---------- 大厅: 存档与配置 ----------
 
     def api_saves(self) -> dict:
@@ -94,9 +99,9 @@ class GameServer:
 
     def api_create(self, name: str, hero: str) -> dict:
         name = (name or "").strip()
-        hero = (hero or "").strip() or "勇者"
+        hero = (hero or "").strip() or self._t("勇者", "the Hero")
         if not name:
-            return {"ok": False, "message": "存档名不能为空"}
+            return {"ok": False, "message": self._t("存档名不能为空", "Save name is required")}
         with self.lock:
             try:
                 save = st.new_save(name, hero, self.cfg.get("language", "zh"))
@@ -108,9 +113,11 @@ class GameServer:
     def api_delete(self, name: str) -> dict:
         with self.lock:
             if self.game is not None and self.game.save.get("name") == (name or "").strip():
-                return {"ok": False, "message": "该存档正在游戏中, 请先退出服务或另选存档"}
+                return {"ok": False, "message": self._t(
+                    "该存档正在游戏中, 请先退出服务或另选存档",
+                    "That save is in play — quit the server or pick another first")}
             ok = st.delete_save((name or "").strip())
-        return {"ok": ok, "message": "" if ok else "存档不存在"}
+        return {"ok": ok, "message": "" if ok else self._t("存档不存在", "Save not found")}
 
     def api_enter(self, name: str) -> dict:
         with self.lock:
@@ -118,8 +125,9 @@ class GameServer:
                 save = st.load_save((name or "").strip())
             except st.SaveError as e:
                 return {"ok": False, "message": str(e)}
+            # 界面 chrome 跟随全局配置语言 (大厅切换后旧存档一并跟随)
             self.game = engine.Game(save, self.cfg,
-                                    CollectingUI(save.get("language", self.cfg.get("language", "zh"))))
+                                    CollectingUI(self.cfg.get("language", "zh")))
         return {"ok": True}
 
     def api_config_get(self) -> dict:
@@ -145,11 +153,21 @@ class GameServer:
         return {"ok": True, "reply": (reply or "")[:80]}
 
     def api_config_save(self, body: dict) -> dict:
+        # 仅语言的更新(右上角切换): 合并进现有配置, 不触碰服务商/模型
+        if body.get("language") in ("zh", "en") and not body.get("provider"):
+            cfg = dict(self.cfg)
+            cfg["language"] = body["language"]
+            from rpg import save_config
+            save_config(cfg)
+            self.cfg = cfg
+            return {"ok": True, "config": _public_config(cfg)}
         cfg = _draft_cfg(body)
         if not cfg["provider"]:
-            return {"ok": False, "message": "provider 不能为空"}
+            return {"ok": False, "message": self._t("provider 不能为空", "provider is required")}
         if not cfg["model"]:
-            return {"ok": False, "message": "模型名不能为空 (可先点「拉取模型列表」)"}
+            return {"ok": False, "message": self._t(
+                "模型名不能为空 (可先点「拉取模型列表」)",
+                "model is required (try \"Fetch models\" first)")}
         try:
             temperature = float(body.get("temperature", self.cfg.get("temperature", 0.9)))
         except (TypeError, ValueError):
@@ -166,7 +184,7 @@ class GameServer:
                 st.save_game(self.game.save)
         if self.on_shutdown:
             threading.Thread(target=self.on_shutdown, daemon=True).start()
-        return {"ok": True, "message": "已存档, 服务退出。"}
+        return {"ok": True, "message": self._t("已存档, 服务退出。", "Saved; server shutting down.")}
 
     # ---------- 对局 ----------
 
@@ -190,7 +208,8 @@ class GameServer:
         return {
             "ok": True,
             "in_game": True,
-            "meta": {"name": save["name"], "hero": save["hero"], "language": save.get("language", "zh"),
+            "meta": {"name": save["name"], "hero": save["hero"],
+                     "language": self.cfg.get("language", "zh"),
                      "day": s["day"], "period": s["period"], "location": s["location"],
                      "turn": save["turn"], "provider": save.get("provider", {})},
             "stage_spec": {"coords": prompts.STAGE_COORDS, "smin": prompts.S_MIN, "smax": prompts.S_MAX,
@@ -205,28 +224,36 @@ class GameServer:
 
     def api_say(self, text: str) -> dict:
         if self.game is None:
-            return {"ok": False, "kind": "error", "message": "尚未进入存档"}
+            return {"ok": False, "kind": "error",
+                    "message": self._t("尚未进入存档", "No save is active")}
         text = (text or "").strip()
         if not text:
-            return {"ok": False, "kind": "error", "message": "输入为空"}
+            return {"ok": False, "kind": "error", "message": self._t("输入为空", "Empty input")}
         ui: CollectingUI = self.game.ui
         with self.lock:
             if text.startswith("/"):
                 cmd = text.split()[0].lower()
                 if cmd == "/config":
                     return {"ok": True, "kind": "command",
-                            "events": [{"k": "warn", "t": "网页模式请回到大厅页使用「配置 API」"
-                                                       "（刷新页面即可返回大厅）。"}]}
+                            "events": [{"k": "warn",
+                                        "t": self._t("网页模式请回到大厅页使用「配置 API」"
+                                                     "（刷新页面即可返回大厅）。",
+                                                     "In web mode use \"Configure API\" on the lobby page "
+                                                     "(refresh to return to the lobby).")}]}
                 if cmd in ("/quit", "/exit", "/q"):
                     return {"ok": True, "kind": "command",
-                            "events": [{"k": "info", "t": "网页模式请直接关闭页面；"
-                                                         "进度每回合已自动存档。"}]}
+                            "events": [{"k": "info",
+                                        "t": self._t("网页模式请直接关闭页面；进度每回合已自动存档。",
+                                                     "In web mode just close the page; "
+                                                     "progress is auto-saved every turn.")}]}
                 ui.events = []
                 cont = self.game.command(text)
                 events = ui.events
                 if not cont:
-                    events = events + [{"k": "info", "t": "（本局已结束；服务保持运行，"
-                                                         "刷新页面可回到大厅新建。）"}]
+                    events = events + [{"k": "info",
+                                        "t": self._t("（本局已结束；服务保持运行，刷新页面可回到大厅新建。）",
+                                                     "(This game has ended; the server keeps running — "
+                                                     "refresh to return to the lobby.)")}]
                 return {"ok": True, "kind": "command", "events": events,
                         "stage": self.game.save.get("stage", [])}
             ui.events = []
@@ -234,7 +261,8 @@ class GameServer:
             events = ui.events
             if not ok:
                 err = next((e["t"] for e in reversed(events) if e["k"] == "error"),
-                           "回合生成失败，请换种说法重试。")
+                           self._t("回合生成失败，请换种说法重试。",
+                                   "Turn generation failed — try rephrasing."))
                 return {"ok": False, "kind": "error", "message": err, "events": events}
             return {
                 "ok": True,
@@ -303,7 +331,9 @@ class Handler(BaseHTTPRequestHandler):
         gs: GameServer = self.server.gameserver
         data = self._body()
         if data is None:
-            return self._json({"ok": False, "message": "请求体不是合法 JSON"}, 400)
+            gs: GameServer = self.server.gameserver
+            return self._json({"ok": False,
+                               "message": gs._t("请求体不是合法 JSON", "Request body is not valid JSON")}, 400)
         if path == "/api/say":
             return self._json(gs.api_say(str(data.get("text", ""))))
         if path == "/api/saves":

@@ -1,6 +1,7 @@
-/* 完全开放式RPG · 网页客户端 (大厅 + 游戏, ../规划.md §8/§10)
-   启动 → /api/state: in_game=false 进大厅(新建/选择/删除/配置API/退出);
+/* 完全开放式RPG · 网页客户端 (大厅 + 游戏, ../规划.md §8/§9/§10)
+   启动 → /api/config 定界面语言 → /api/state: in_game=false 进大厅(新建/选择/删除/配置API/退出);
    选择存档后 POST /api/enter 切换到游戏视图。
+   右上角语言切换: 保存到 config.language 后重载, 全部 chrome/引导/按钮按语言渲染 (规划.md 第五轮追加)。
    本文由 ZCode (GLM-5.3-Flash) 编写。 */
 (function () {
   "use strict";
@@ -11,20 +12,123 @@
   var meta = {};
   var providers = [];
   var gameBound = false;
+  var UIL = "zh"; // 界面语言 (boot 时取自 config.language)
   var PERIOD_EN = { "清晨": "dawn", "上午": "morning", "下午": "afternoon", "傍晚": "evening", "夜晚": "night" };
+  var TONE_EN = { "暗": "dark", "明": "bright", "暖": "warm", "冷": "cold", "灰": "gray" };
 
-  function lang() { return meta.language === "en" ? "en" : "zh"; }
-  function periodLabel(p) { return lang() === "en" ? (PERIOD_EN[p] || p) : p; }
-  function dayLabel(day, period) {
-    return lang() === "en" ? "Day " + day + " · " + periodLabel(period)
-                           : "第" + day + "天·" + period;
+  // ---------- 双语文案 (chrome/引导/按钮/提示) ----------
+  var STR = {
+    zh: {
+      brand: "完全开放式RPG", docTitle: "完全开放式RPG · 字画",
+      langTip: "切换界面与游戏语言",
+      navLedger: "账本", navHistory: "历史",
+      lobbySub: "一个\"只提供开头\"的文字冒险——任务、NPC、画面，其余一切由 LLM 即时生成",
+      notConfigured: "未配置", cfgCurrent: "当前：{p} / {m}",
+      btnConfig: "配置 API", newTitle: "新建存档",
+      phSaveName: "存档名", phHeroName: "主角名（默认：勇者）",
+      btnCreate: "创建并进入", savesTitle: "存档选择",
+      btnExit: "退出（存档并关闭服务）",
+      stageTip: "点击翻页", storyTip: "左右滑动或用 ◀ ▶ 翻页",
+      pgPrev: "上一页", pgNext: "下一页", suggestions: "下一步建议",
+      busy: "世界正在推演……", phInput: "输入你的行动……（/help 查看命令）", btnAct: "行动",
+      cfgLang: "游戏语言", cfgProvider: "服务商", cfgModel: "模型",
+      phBase: "以 /v1 结尾（留空用预设）", phKey: "密码式输入, 只存本机",
+      phModel: "模型名", btnModels: "拉取模型列表", btnTest: "测试对话", btnSave: "保存",
+      ledgerTitle: "世界账本", historyTitle: "最近剧情", close: "关闭",
+      emptySaves: "（还没有存档——先在上面新建一个）",
+      enter: "进入", del: "删除", confirmDelete: "确认删除「{name}」？不可恢复。", deleteFail: "删除失败",
+      entering: "正在进入「{name}」……", enterFail: "进入失败",
+      fillName: "请先填写存档名", createFail: "创建失败",
+      keySaved: "已保存（留空则沿用已存 key）",
+      pulling: "正在拉取模型列表……", pullFail: "拉取失败：",
+      pulled: "拉取到 {n} 个模型，下拉选择或直接手填。",
+      noModels: "服务商未返回模型列表，请手填模型名。",
+      testing: "测试对话中……", testOk: "连接成功，模型回复：{reply}", testFail: "测试失败：",
+      cfgSaved: "已保存到本机 config.json。", cfgSaveFail: "保存失败",
+      phBasePreset: "留空用预设：{url}", phBaseRequired: "必填：以 /v1 结尾",
+      phModelPreset: "留空用预设：{m}", phModelRequired: "必填：模型名",
+      phKeyIdle: "API key（密码式, 只存本机）", phKeyLocal: "本地模型可留空",
+      exitConfirm: "确认退出？将保存当前对局并关闭服务。", exiting: "正在退出……",
+      bye: "服务已退出，已自动存档。可关闭此页面。",
+      historyEmpty: "（还没有剧情——打完第一回合就会出现在这里）",
+      noSlide: "（暂无画面——剧情继续中）", toneWord: "色调",
+      dice: "🎲 命运骰 {roll}/20 · {label}",
+      netError: "网络错误: {msg}", reqFail: "请求失败",
+      heroWord: "主角", saveWord: "存档", turnWord: "回合", dayWord: "第{d}天·{p}",
+      metaLobby: "启动到大厅……",
+    },
+    en: {
+      brand: "OpenEndRPG", docTitle: "OpenEndRPG · Glyph Slides",
+      langTip: "Switch UI & game language",
+      navLedger: "Ledger", navHistory: "History",
+      lobbySub: "A text adventure that \"only provides a beginning\" — quests, NPCs, scenes: everything else is generated on the fly by an LLM",
+      notConfigured: "Not configured", cfgCurrent: "Current: {p} / {m}",
+      btnConfig: "Configure API", newTitle: "New save",
+      phSaveName: "Save name", phHeroName: "Hero name (default: the Hero)",
+      btnCreate: "Create & enter", savesTitle: "Saves",
+      btnExit: "Exit (save & shut down)",
+      stageTip: "Click to advance", storyTip: "Swipe or use ◀ ▶ to page",
+      pgPrev: "Previous page", pgNext: "Next page", suggestions: "Next-step suggestions",
+      busy: "The world is deliberating……", phInput: "Type your action… (/help for commands)", btnAct: "Act",
+      cfgLang: "Language", cfgProvider: "Provider", cfgModel: "Model",
+      phBase: "ends with /v1 (blank = preset)", phKey: "password-style, stored locally",
+      phModel: "Model name", btnModels: "Fetch models", btnTest: "Test chat", btnSave: "Save",
+      ledgerTitle: "World ledger", historyTitle: "Recent story", close: "Close",
+      emptySaves: "(No saves yet — create one above)",
+      enter: "Enter", del: "Delete", confirmDelete: "Delete \"{name}\"? This cannot be undone.", deleteFail: "Delete failed",
+      entering: "Entering \"{name}\"……", enterFail: "Failed to enter",
+      fillName: "Please enter a save name first", createFail: "Failed to create",
+      keySaved: "Saved (leave blank to keep the stored key)",
+      pulling: "Fetching model list……", pullFail: "Fetch failed: ",
+      pulled: "Fetched {n} models — pick one from the dropdown or type a name.",
+      noModels: "The provider returned no model list; type a model name.",
+      testing: "Testing chat……", testOk: "Connected. Model replied: {reply}", testFail: "Test failed: ",
+      cfgSaved: "Saved to local config.json.", cfgSaveFail: "Save failed",
+      phBasePreset: "blank = preset: {url}", phBaseRequired: "Required: ends with /v1",
+      phModelPreset: "blank = preset: {m}", phModelRequired: "Required: model name",
+      phKeyIdle: "API key (password-style, stored locally)", phKeyLocal: "Local models may leave this blank",
+      exitConfirm: "Quit? The current game will be saved and the server shut down.", exiting: "Shutting down……",
+      bye: "Server shut down; the game was saved. You can close this page.",
+      historyEmpty: "(No story yet — finish the first turn and it appears here)",
+      noSlide: "(no slide yet — the story goes on)", toneWord: "tone",
+      dice: "🎲 Fate die {roll}/20 · {label}",
+      netError: "Network error: {msg}", reqFail: "Request failed",
+      heroWord: "hero", saveWord: "Save", turnWord: "turn", dayWord: "Day {d} · {p}",
+      metaLobby: "Starting lobby……",
+    }
+  };
+
+  function t(key, vars) {
+    var s = (STR[UIL] && STR[UIL][key]) || STR.zh[key] || key;
+    if (vars) Object.keys(vars).forEach(function (k) {
+      s = s.split("{" + k + "}").join(vars[k]);
+    });
+    return s;
   }
+  function lang() { return UIL; }
+  function periodLabel(p) { return UIL === "en" ? (PERIOD_EN[p] || p) : p; }
+  function dayLabel(day, period) { return t("dayWord", { d: day, p: periodLabel(period) }); }
 
-  // 故事分页状态
-  var pages = [];
-  var pageIdx = 0;
-  var typing = null;
-  var PAGE_MAX = 620;
+  // 静态文案按语言渲染 (data-i18n / data-i18n-ph / data-i18n-title / data-i18n-aria)
+  function applyStatic() {
+    document.documentElement.lang = UIL === "en" ? "en" : "zh-CN";
+    document.title = t("docTitle");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n]"), function (elx) {
+      elx.textContent = t(elx.getAttribute("data-i18n"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-ph]"), function (elx) {
+      elx.placeholder = t(elx.getAttribute("data-i18n-ph"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-title]"), function (elx) {
+      elx.title = t(elx.getAttribute("data-i18n-title"));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-i18n-aria]"), function (elx) {
+      elx.setAttribute("aria-label", t(elx.getAttribute("data-i18n-aria")));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".panel .close"), function (elx) {
+      elx.setAttribute("aria-label", t("close"));
+    });
+  }
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -61,31 +165,33 @@
   function onProviderChange() {
     var p = currentProvider();
     if (!p) return;
-    $("#cfg-base").placeholder = p.base_url ? "留空用预设：" + p.base_url : "必填：以 /v1 结尾";
-    $("#cfg-model").placeholder = p.default_model ? "留空用预设：" + p.default_model : "必填：模型名";
-    $("#cfg-key").placeholder = p.need_key ? "API key（密码式, 只存本机）" : "本地模型可留空";
+    $("#cfg-base").placeholder = p.base_url ? t("phBasePreset", { url: p.base_url }) : t("phBaseRequired");
+    $("#cfg-model").placeholder = p.default_model ? t("phModelPreset", { m: p.default_model }) : t("phModelRequired");
+    $("#cfg-key").placeholder = p.need_key ? t("phKeyIdle") : t("phKeyLocal");
   }
 
   function renderSaveList(saves) {
     var box = $("#save-list");
     box.innerHTML = "";
     if (!(saves || []).length) {
-      box.appendChild(el("div", "ev", "（还没有存档——先在上面新建一个）"));
+      box.appendChild(el("div", "ev", t("emptySaves")));
       return;
     }
     saves.forEach(function (s) {
       var row = el("div", "save-row");
       row.appendChild(el("span", "save-name grow",
-        s.name + "（第" + s.day + "天 · " + s.turn + "回合 · " + s.updated_at + "）"));
-      var enter = el("button", "mini", "进入");
+        UIL === "en"
+          ? s.name + " (Day " + s.day + " · " + s.turn + " turns · " + s.updated_at + ")"
+          : s.name + "（第" + s.day + "天 · " + s.turn + "回合 · " + s.updated_at + "）"));
+      var enter = el("button", "mini", t("enter"));
       enter.type = "button";
       enter.addEventListener("click", function () { enterSave(s.name); });
-      var del = el("button", "mini danger", "删除");
+      var del = el("button", "mini danger", t("del"));
       del.type = "button";
       del.addEventListener("click", async function () {
-        if (!window.confirm("确认删除「" + s.name + "」？不可恢复。")) return;
+        if (!window.confirm(t("confirmDelete", { name: s.name }))) return;
         var r = await post("/api/saves/delete", { name: s.name });
-        if (!r.ok) lobbyMsg(r.message || "删除失败", true);
+        if (!r.ok) lobbyMsg(r.message || t("deleteFail"), true);
         loadLobby();
       });
       row.appendChild(enter);
@@ -99,16 +205,19 @@
     providers = cfg.providers || [];
     var sel = $("#cfg-provider");
     sel.innerHTML = "";
-    providers.forEach(function (p) { sel.appendChild(new Option(p.name, p.id)); });
+    providers.forEach(function (p) {
+      sel.appendChild(new Option(UIL === "en" && p.name_en ? p.name_en : p.name, p.id));
+    });
     sel.value = cfg.config.provider || "mock";
     onProviderChange();
     $("#cfg-language").value = cfg.config.language === "en" ? "en" : "zh";
+    $("#ui-language").value = UIL;
     $("#cfg-base").value = cfg.config.base_url || "";
     $("#cfg-key").value = "";
-    $("#cfg-key").placeholder = cfg.config.api_key_set
-      ? "已保存（留空则沿用已存 key）" : $("#cfg-key").placeholder;
+    $("#cfg-key").placeholder = cfg.config.api_key_set ? t("keySaved") : $("#cfg-key").placeholder;
     $("#cfg-line").textContent = cfg.config.configured
-      ? "当前：" + cfg.config.provider + " / " + cfg.config.model : "未配置";
+      ? t("cfgCurrent", { p: cfg.config.provider, m: cfg.config.model })
+      : t("notConfigured");
     var saves = await (await fetch("/api/saves")).json();
     renderSaveList(saves.saves);
   }
@@ -128,56 +237,56 @@
   }
 
   async function pullModels() {
-    cfgMsg("正在拉取模型列表……");
+    cfgMsg(t("pulling"));
     var r = await post("/api/models", draftFromForm());
-    if (!r.ok) { cfgMsg("拉取失败：" + r.message, true); return; }
+    if (!r.ok) { cfgMsg(t("pullFail") + r.message, true); return; }
     var sel = $("#cfg-models");
     sel.innerHTML = "";
     (r.models || []).forEach(function (m) { sel.appendChild(new Option(m, m)); });
     if ((r.models || []).length) {
       sel.hidden = false;
       sel.onchange = function () { $("#cfg-model").value = sel.value; };
-      cfgMsg("拉取到 " + r.models.length + " 个模型，下拉选择或直接手填。");
+      cfgMsg(t("pulled", { n: r.models.length }));
     } else {
       sel.hidden = true;
-      cfgMsg("服务商未返回模型列表，请手填模型名。");
+      cfgMsg(t("noModels"));
     }
   }
 
   async function testConfig() {
-    cfgMsg("测试对话中……");
+    cfgMsg(t("testing"));
     var r = await post("/api/config/test", draftFromForm());
-    if (r.ok) cfgMsg("连接成功，模型回复：" + r.reply);
-    else cfgMsg("测试失败：" + r.message, true);
+    if (r.ok) cfgMsg(t("testOk", { reply: r.reply }));
+    else cfgMsg(t("testFail") + r.message, true);
   }
 
   async function saveConfig() {
     var r = await post("/api/config", draftFromForm());
     if (r.ok) {
-      $("#cfg-line").textContent = "当前：" + r.config.provider + " / " + r.config.model;
+      $("#cfg-line").textContent = t("cfgCurrent", { p: r.config.provider, m: r.config.model });
       $("#cfg-key").value = "";
-      $("#cfg-key").placeholder = "已保存（留空则沿用已存 key）";
-      cfgMsg("已保存到本机 config.json。");
+      $("#cfg-key").placeholder = t("keySaved");
+      cfgMsg(t("cfgSaved"));
     } else {
-      cfgMsg(r.message || "保存失败", true);
+      cfgMsg(r.message || t("cfgSaveFail"), true);
     }
   }
 
   async function enterSave(name) {
-    lobbyMsg("正在进入「" + name + "」……");
+    lobbyMsg(t("entering", { name: name }));
     var r = await post("/api/enter", { name: name });
-    if (!r.ok) { lobbyMsg(r.message || "进入失败", true); return; }
+    if (!r.ok) { lobbyMsg(r.message || t("enterFail"), true); return; }
     var state = await (await fetch("/api/state")).json();
     enterGame(state);
   }
 
   async function exitServer() {
-    if (!window.confirm("确认退出？将保存当前对局并关闭服务。")) return;
-    lobbyMsg("正在退出……");
+    if (!window.confirm(t("exitConfirm"))) return;
+    lobbyMsg(t("exiting"));
     await post("/api/shutdown", {});
     document.querySelector("main").innerHTML = "";
     var bye = el("div", "lobby-card");
-    bye.appendChild(el("b", "", "服务已退出，已自动存档。可关闭此页面。"));
+    bye.appendChild(el("b", "", t("bye")));
     document.querySelector("main").appendChild(bye);
   }
 
@@ -189,23 +298,25 @@
     var s = meta.state || meta;
     var prov = meta.provider || {};
     $("#meta").textContent =
-      "存档「" + (meta.name || "—") + "」 主角:" + (meta.hero || "—") +
+      (UIL === "en"
+        ? "Save \"" + (meta.name || "—") + "\" hero:" + (meta.hero || "—")
+        : "存档「" + (meta.name || "—") + "」 主角:" + (meta.hero || "—")) +
       " · " + dayLabel(s.day, s.period) + " · " + s.location +
-      " · 回合" + s.turn +
+      " · " + t("turnWord") + s.turn +
       (prov.provider ? " · " + prov.provider + "/" + prov.model : "");
   }
 
   function renderHistory(tail) {
     var box = $("#history-list");
     box.innerHTML = "";
-    (tail || []).forEach(function (t) {
+    (tail || []).forEach(function (t2) {
       var item = el("div", "h-item");
-      item.appendChild(el("b", "", "回合 " + t.turn + " · " + (t.player || "（开场）")));
-      item.appendChild(el("p", "", (t.narrative || "").replace(/\*\*/g, "")));
+      item.appendChild(el("b", "", (UIL === "en" ? "Turn " : "回合 ") + t2.turn + " · " + (t2.player || (UIL === "en" ? "(opening)" : "（开场）"))));
+      item.appendChild(el("p", "", (t2.narrative || "").replace(/\*\*/g, "")));
       box.appendChild(item);
     });
     if (!(tail || []).length) {
-      box.appendChild(el("div", "ev", "（还没有剧情——打完第一回合就会出现在这里）"));
+      box.appendChild(el("div", "ev", t("historyEmpty")));
     }
   }
 
@@ -263,6 +374,11 @@
     return out;
   }
 
+  var PAGE_MAX = 620;
+  var pages = [];
+  var pageIdx = 0;
+  var typing = null;
+
   function stopTyping(finish) {
     if (typing) {
       clearInterval(typing);
@@ -292,9 +408,9 @@
     pageIdx = 0;
     var track = $("#story-track");
     track.innerHTML = "";
-    texts.forEach(function (t) {
+    texts.forEach(function (tx) {
       var d = el("div", "story-page");
-      d.textContent = t;
+      d.textContent = tx;
       track.appendChild(d);
     });
     updatePager();
@@ -330,14 +446,15 @@
       dots.appendChild(el("span", "dot" + (i === idx ? " on" : "")));
     }
     if (idx < 0) {
-      $("#slide-caption").textContent = lang() === "en"
-        ? "(no slide yet — the story goes on)" : "（暂无画面——剧情继续中）";
+      $("#slide-caption").textContent = t("noSlide");
       return;
     }
     var s = meta.state || meta;
     var parts = [];
     if (caption) parts.push(caption);
-    if (tone) parts.push(tone + "色调");
+    if (tone) parts.push(UIL === "en"
+      ? (TONE_EN[tone] || tone) + " " + t("toneWord")
+      : tone + t("toneWord"));
     if (s.day != null) parts.push(dayLabel(s.day, s.period) + " · " + s.location);
     if (total > 1) parts.push((idx + 1) + "/" + total);
     $("#slide-caption").textContent = parts.join(" · ");
@@ -350,7 +467,7 @@
     var box = renderEvents(d.events || []);
     if (d.dice && d.dice.roll) {
       box.prepend(el("div", "ev ev-dice",
-        "🎲 命运骰 " + d.dice.roll + "/20 · " + (d.dice.label || "")));
+        t("dice", { roll: d.dice.roll, label: d.dice.label || "" })));
     }
     setSuggestions(d.suggestions || []);
     if (d.stage && d.stage.length) stage.play(d.stage, { all: true });
@@ -377,10 +494,10 @@
         }
         refreshMeta();
       } else {
-        renderEvents([]).appendChild(el("div", "ev ev-error", d.message || "请求失败"));
+        renderEvents([]).appendChild(el("div", "ev ev-error", d.message || t("reqFail")));
       }
     } catch (e) {
-      renderEvents([]).appendChild(el("div", "ev ev-error", "网络错误: " + e.message));
+      renderEvents([]).appendChild(el("div", "ev ev-error", t("netError", { msg: e.message })));
     } finally {
       $("#busy").hidden = true;
       $("#input").disabled = false;
@@ -433,6 +550,19 @@
   // ================= 启动 =================
 
   async function boot() {
+    // 先取配置定界面语言, 再渲染全部静态文案
+    var cfg0 = await (await fetch("/api/config")).json();
+    UIL = cfg0.config.language === "en" ? "en" : "zh";
+    applyStatic();
+    $("#ui-language").value = UIL;
+
+    // 右上角语言切换: 保存到 config.language 后重载, chrome 与生成语言一并切换
+    $("#ui-language").addEventListener("change", async function () {
+      var r = await post("/api/config", { language: this.value });
+      if (r.ok) location.reload();
+      else cfgMsg(r.message || t("cfgSaveFail"), true);
+    });
+
     // 大厅绑定
     $("#btn-config").addEventListener("click", function () {
       $("#config-panel").hidden = false;
@@ -448,9 +578,9 @@
     $("#new-form").addEventListener("submit", async function (ev) {
       ev.preventDefault();
       var name = $("#new-name").value.trim();
-      if (!name) { lobbyMsg("请先填写存档名", true); return; }
+      if (!name) { lobbyMsg(t("fillName"), true); return; }
       var r = await post("/api/saves", { name: name, hero: $("#new-hero").value });
-      if (!r.ok) { lobbyMsg(r.message || "创建失败", true); return; }
+      if (!r.ok) { lobbyMsg(r.message || t("createFail"), true); return; }
       $("#new-name").value = "";
       $("#new-hero").value = "";
       enterSave(name);
@@ -466,6 +596,6 @@
   }
 
   boot().catch(function (e) {
-    document.body.appendChild(el("div", "ev ev-error", "启动失败: " + e.message));
+    document.body.appendChild(el("div", "ev ev-error", "Boot failed: " + e.message));
   });
 })();

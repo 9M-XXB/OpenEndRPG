@@ -9,115 +9,121 @@
 <body class="lobby">
 <header>
   <div class="brand">
-    <h1>完全开放式RPG</h1>
-    <div id="meta">启动到大厅……</div>
+    <h1 data-i18n="brand">完全开放式RPG</h1>
+    <div id="meta" data-i18n="metaLobby">启动到大厅……</div>
   </div>
-  <nav>
-    <button id="btn-ledger" type="button">账本</button>
-    <button id="btn-history" type="button">历史</button>
-  </nav>
+  <div class="hdr-right">
+    <select id="ui-language" data-i18n-title="langTip" aria-label="Language / 语言">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+    <nav>
+      <button id="btn-ledger" type="button" data-i18n="navLedger">账本</button>
+      <button id="btn-history" type="button" data-i18n="navHistory">历史</button>
+    </nav>
+  </div>
 </header>
 
 <main>
   <!-- 大厅: 新建存档 / 存档选择 / 删除存档 / 配置 API / 退出 -->
   <section id="lobby">
-    <h1>完全开放式RPG</h1>
-    <p class="lobby-sub">一个"只提供开头"的文字冒险——任务、NPC、画面，其余一切由 LLM 即时生成</p>
+    <h1 data-i18n="brand">完全开放式RPG</h1>
+    <p class="lobby-sub" data-i18n="lobbySub">一个"只提供开头"的文字冒险——任务、NPC、画面，其余一切由 LLM 即时生成</p>
 
     <div class="lobby-card">
       <div class="card-title">API</div>
       <div class="row">
-        <span id="cfg-line" class="grow">未配置</span>
-        <button id="btn-config" type="button" class="mini">配置 API</button>
+        <span id="cfg-line" class="grow" data-i18n="notConfigured">未配置</span>
+        <button id="btn-config" type="button" class="mini" data-i18n="btnConfig">配置 API</button>
       </div>
       <div id="lobby-msg" class="ev"></div>
     </div>
 
     <form id="new-form" class="lobby-card">
-      <div class="card-title">新建存档</div>
-      <input id="new-name" placeholder="存档名" required>
-      <input id="new-hero" placeholder="主角名（默认：勇者）">
-      <button type="submit" class="primary">创建并进入</button>
+      <div class="card-title" data-i18n="newTitle">新建存档</div>
+      <input id="new-name" data-i18n-ph="phSaveName" placeholder="存档名" required>
+      <input id="new-hero" data-i18n-ph="phHeroName" placeholder="主角名（默认：勇者）">
+      <button type="submit" class="primary" data-i18n="btnCreate">创建并进入</button>
     </form>
 
     <div class="lobby-card">
-      <div class="card-title">存档选择</div>
+      <div class="card-title" data-i18n="savesTitle">存档选择</div>
       <div id="save-list"></div>
     </div>
 
     <div class="lobby-foot">
-      <button id="btn-exit" type="button" class="mini danger">退出（存档并关闭服务）</button>
+      <button id="btn-exit" type="button" class="mini danger" data-i18n="btnExit">退出（存档并关闭服务）</button>
     </div>
   </section>
 
   <!-- 游戏 -->
   <section id="stage-wrap">
-    <div id="stage" title="点击翻页"></div>
+    <div id="stage" data-i18n-title="stageTip" title="点击翻页"></div>
     <div id="slide-dots" aria-hidden="true"></div>
     <div id="slide-caption"></div>
   </section>
 
   <section id="story">
-    <div id="story-viewport" title="左右滑动或用 ◀ ▶ 翻页">
+    <div id="story-viewport" data-i18n-title="storyTip" title="左右滑动或用 ◀ ▶ 翻页">
       <div id="story-track"></div>
     </div>
     <div id="story-pager">
-      <button id="pg-prev" type="button" aria-label="上一页">◀</button>
+      <button id="pg-prev" type="button" data-i18n-title="pgPrev" aria-label="上一页">◀</button>
       <div id="pg-dots" aria-hidden="true"></div>
-      <button id="pg-next" type="button" aria-label="下一页">▶</button>
+      <button id="pg-next" type="button" data-i18n-title="pgNext" aria-label="下一页">▶</button>
       <span id="pg-label"></span>
     </div>
     <div id="events"></div>
-    <div id="suggestions" aria-label="下一步建议"></div>
+    <div id="suggestions" data-i18n-aria="suggestions" aria-label="下一步建议"></div>
   </section>
 </main>
 
 <footer>
-  <div id="busy" hidden>世界正在推演……</div>
+  <div id="busy" hidden data-i18n="busy">世界正在推演……</div>
   <form id="input-form">
-    <input id="input" autocomplete="off" placeholder="输入你的行动……（/help 查看命令）">
-    <button type="submit">行动</button>
+    <input id="input" autocomplete="off" data-i18n-ph="phInput" placeholder="输入你的行动……（/help 查看命令）">
+    <button type="submit" data-i18n="btnAct">行动</button>
   </form>
 </footer>
 
 <!-- 配置 API 弹窗 -->
 <aside id="config-panel" class="panel" hidden>
-  <h2>配置 API <button type="button" class="close" aria-label="关闭">×</button></h2>
-  <label>游戏语言 / Language
+  <h2><span data-i18n="btnConfig">配置 API</span> <button type="button" class="close" aria-label="关闭">×</button></h2>
+  <label><span data-i18n="cfgLang">游戏语言</span>
     <select id="cfg-language">
       <option value="zh">中文</option>
       <option value="en">English</option>
     </select>
   </label>
-  <label>服务商
+  <label><span data-i18n="cfgProvider">服务商</span>
     <select id="cfg-provider"></select>
   </label>
   <label>base_url
-    <input id="cfg-base" placeholder="以 /v1 结尾（留空用预设）">
+    <input id="cfg-base" data-i18n-ph="phBase" placeholder="以 /v1 结尾（留空用预设）">
   </label>
   <label>API key
-    <input id="cfg-key" type="password" placeholder="密码式输入, 只存本机">
+    <input id="cfg-key" type="password" data-i18n-ph="phKey" placeholder="密码式输入, 只存本机">
   </label>
-  <label>模型
-    <input id="cfg-model" placeholder="模型名">
-    <button id="btn-models" type="button" class="mini">拉取模型列表</button>
+  <label><span data-i18n="cfgModel">模型</span>
+    <input id="cfg-model" data-i18n-ph="phModel" placeholder="模型名">
+    <button id="btn-models" type="button" class="mini" data-i18n="btnModels">拉取模型列表</button>
     <select id="cfg-models" hidden></select>
   </label>
   <div class="cfg-actions">
-    <button id="btn-test" type="button" class="mini">测试对话</button>
-    <button id="btn-save-cfg" type="button" class="mini primary">保存</button>
+    <button id="btn-test" type="button" class="mini" data-i18n="btnTest">测试对话</button>
+    <button id="btn-save-cfg" type="button" class="mini primary" data-i18n="btnSave">保存</button>
   </div>
   <div id="cfg-msg" class="ev"></div>
 </aside>
 
 <!-- 账本 / 历史 弹窗 -->
 <aside id="ledger" class="panel" hidden>
-  <h2>世界账本 <button type="button" class="close" aria-label="关闭">×</button></h2>
+  <h2><span data-i18n="ledgerTitle">世界账本</span> <button type="button" class="close" aria-label="关闭">×</button></h2>
   <div id="ledger-list"></div>
 </aside>
 
 <aside id="history" class="panel" hidden>
-  <h2>最近剧情 <button type="button" class="close" aria-label="关闭">×</button></h2>
+  <h2><span data-i18n="historyTitle">最近剧情</span> <button type="button" class="close" aria-label="关闭">×</button></h2>
   <div id="history-list"></div>
 </aside>
 

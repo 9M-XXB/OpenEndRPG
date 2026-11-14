@@ -32,6 +32,8 @@ Requirements: Python 3.10+ and `httpx` (`pip install httpx`; optional `pip insta
 
 **Lobby**: the app starts at a lobby — create a save, pick a save (enter / delete), configure the API, or exit (saving and shutting down). A game starts only after you pick a save; nothing is auto-loaded. The whole API wizard runs in the browser: pick a provider → enter the key (password-style) → fetch the model list → test chat → save.
 
+**Language switch**: the top-right corner always shows a 「中文 / English」 selector (visible in the lobby and in-game). Switching saves it to `config.json` and reloads — **every** UI element (buttons, guides, dialogs, hints, error messages) switches along with the language used for story generation from then on; an old save's existing story stays in its original language, while subsequent turns follow the new one.
+
 - **No fixed port**: defaults to 8770, falls back to a system-assigned free port when busy; `--port 0` always picks a random port.
 - **Skip the lobby**: `--new <save>` / `--save <save>` jump straight into a save.
 - **LAN play**: `--host 0.0.0.0` exposes the server to other devices on your network.

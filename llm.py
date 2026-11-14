@@ -19,13 +19,17 @@ class LLMError(Exception):
     pass
 
 
-def _hint(status: int) -> str:
+def _hint(status: int, language: str = "zh") -> str:
+    en = language == "en"
     if status in (401, 403):
-        return "（API key 无效或无权限，可用 `python3 rpg.py config` 重新配置）"
+        return ("(invalid or unauthorized API key — reconfigure with `python3 rpg.py config`)" if en
+                else "（API key 无效或无权限，可用 `python3 rpg.py config` 重新配置）")
     if status == 429:
-        return "（触发限流/欠费，稍后再试或更换服务商）"
+        return ("(rate limited / out of quota — retry later or switch providers)" if en
+                else "（触发限流/欠费，稍后再试或更换服务商）")
     if status == 404:
-        return "（接口或模型名不存在，检查 base_url 与模型名）"
+        return ("(endpoint or model not found — check base_url and the model name)" if en
+                else "（接口或模型名不存在，检查 base_url 与模型名）")
     return ""
 
 
@@ -33,20 +37,20 @@ def _hint(status: int) -> str:
 # protocol: openai | anthropic | google | mock
 
 PROVIDERS = [
-    {"id": "openai",      "name": "OpenAI",              "protocol": "openai",    "base_url": "https://api.openai.com/v1",                    "model": "gpt-4o-mini",           "key": True},
-    {"id": "deepseek",    "name": "DeepSeek 深度求索",    "protocol": "openai",    "base_url": "https://api.deepseek.com/v1",                  "model": "deepseek-chat",         "key": True},
-    {"id": "kimi",        "name": "Kimi / Moonshot",     "protocol": "openai",    "base_url": "https://api.moonshot.cn/v1",                   "model": "moonshot-v1-8k",        "key": True},
-    {"id": "zhipu",       "name": "智谱 GLM",            "protocol": "openai",    "base_url": "https://open.bigmodel.cn/api/paas/v4",         "model": "glm-4-flash",           "key": True},
-    {"id": "qwen",        "name": "通义千问 Qwen（兼容模式）", "protocol": "openai", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus",        "key": True},
-    {"id": "openrouter",  "name": "OpenRouter（聚合）",   "protocol": "openai",    "base_url": "https://openrouter.ai/api/v1",                 "model": "openai/gpt-4o-mini",    "key": True},
-    {"id": "groq",        "name": "Groq",                "protocol": "openai",    "base_url": "https://api.groq.com/openai/v1",               "model": "llama-3.3-70b-versatile", "key": True},
-    {"id": "siliconflow", "name": "SiliconFlow 硅基流动", "protocol": "openai",    "base_url": "https://api.siliconflow.cn/v1",                "model": "Qwen/Qwen2.5-7B-Instruct", "key": True},
-    {"id": "ollama",      "name": "Ollama（本地, 免key）", "protocol": "openai",   "base_url": "http://127.0.0.1:11434/v1",                    "model": "qwen2.5:7b",            "key": False},
-    {"id": "lmstudio",    "name": "LM Studio（本地, 免key）", "protocol": "openai", "base_url": "http://127.0.0.1:1234/v1",                    "model": "",                      "key": False},
-    {"id": "anthropic",   "name": "Claude (Anthropic)",  "protocol": "anthropic", "base_url": "https://api.anthropic.com",                    "model": "claude-sonnet-4-5",     "key": True},
-    {"id": "gemini",      "name": "Gemini (Google)",     "protocol": "google",    "base_url": "https://generativelanguage.googleapis.com",    "model": "gemini-2.0-flash",      "key": True},
-    {"id": "custom",      "name": "自定义 OpenAI 兼容端点", "protocol": "openai",   "base_url": "",                                            "model": "",                      "key": True},
-    {"id": "mock",        "name": "Mock（离线测试, 免key）", "protocol": "mock",    "base_url": "mock://local",                                "model": "mock-mini",             "key": False},
+    {"id": "openai",      "name": "OpenAI",              "name_en": "OpenAI",            "protocol": "openai",    "base_url": "https://api.openai.com/v1",                    "model": "gpt-4o-mini",           "key": True},
+    {"id": "deepseek",    "name": "DeepSeek 深度求索",    "name_en": "DeepSeek",          "protocol": "openai",    "base_url": "https://api.deepseek.com/v1",                  "model": "deepseek-chat",         "key": True},
+    {"id": "kimi",        "name": "Kimi / Moonshot",     "name_en": "Kimi / Moonshot",   "protocol": "openai",    "base_url": "https://api.moonshot.cn/v1",                   "model": "moonshot-v1-8k",        "key": True},
+    {"id": "zhipu",       "name": "智谱 GLM",            "name_en": "Zhipu GLM",         "protocol": "openai",    "base_url": "https://open.bigmodel.cn/api/paas/v4",         "model": "glm-4-flash",           "key": True},
+    {"id": "qwen",        "name": "通义千问 Qwen（兼容模式）", "name_en": "Tongyi Qwen (compat)", "protocol": "openai", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus",        "key": True},
+    {"id": "openrouter",  "name": "OpenRouter（聚合）",   "name_en": "OpenRouter",        "protocol": "openai",    "base_url": "https://openrouter.ai/api/v1",                 "model": "openai/gpt-4o-mini",    "key": True},
+    {"id": "groq",        "name": "Groq",                "name_en": "Groq",              "protocol": "openai",    "base_url": "https://api.groq.com/openai/v1",               "model": "llama-3.3-70b-versatile", "key": True},
+    {"id": "siliconflow", "name": "SiliconFlow 硅基流动", "name_en": "SiliconFlow",       "protocol": "openai",    "base_url": "https://api.siliconflow.cn/v1",                "model": "Qwen/Qwen2.5-7B-Instruct", "key": True},
+    {"id": "ollama",      "name": "Ollama（本地, 免key）", "name_en": "Ollama (local, no key)", "protocol": "openai", "base_url": "http://127.0.0.1:11434/v1",                  "model": "qwen2.5:7b",            "key": False},
+    {"id": "lmstudio",    "name": "LM Studio（本地, 免key）", "name_en": "LM Studio (local, no key)", "protocol": "openai", "base_url": "http://127.0.0.1:1234/v1",              "model": "",                      "key": False},
+    {"id": "anthropic",   "name": "Claude (Anthropic)",  "name_en": "Claude (Anthropic)", "protocol": "anthropic", "base_url": "https://api.anthropic.com",                    "model": "claude-sonnet-4-5",     "key": True},
+    {"id": "gemini",      "name": "Gemini (Google)",     "name_en": "Gemini (Google)",   "protocol": "google",    "base_url": "https://generativelanguage.googleapis.com",    "model": "gemini-2.0-flash",      "key": True},
+    {"id": "custom",      "name": "自定义 OpenAI 兼容端点", "name_en": "Custom OpenAI-compatible endpoint", "protocol": "openai", "base_url": "",                                  "model": "",                      "key": True},
+    {"id": "mock",        "name": "Mock（离线测试, 免key）", "name_en": "Mock (offline test, no key)", "protocol": "mock", "base_url": "mock://local",                          "model": "mock-mini",             "key": False},
 ]
 
 
@@ -166,7 +170,7 @@ def _openai_chat(cfg, system, user, on_delta=None) -> str:
         buf = []
         with httpx.stream("POST", url, headers=headers, json=body, timeout=TIMEOUT) as r:
             if r.status_code != 200:
-                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code)}")
+                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code, cfg.get("language"))}")
             for line in r.iter_lines():
                 line = line.strip()
                 if not line.startswith("data:"):
@@ -184,7 +188,7 @@ def _openai_chat(cfg, system, user, on_delta=None) -> str:
         return "".join(buf)
     r = httpx.post(url, headers=headers, json=body, timeout=TIMEOUT)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code, cfg.get("language"))}")
     try:
         return r.json()["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, json.JSONDecodeError) as e:
@@ -195,7 +199,7 @@ def _openai_models(cfg) -> list[str]:
     url = cfg["base_url"].rstrip("/") + "/models"
     r = httpx.get(url, headers={"Authorization": f"Bearer {cfg.get('api_key','')}", **UA}, timeout=30)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code, cfg.get("language"))}")
     return sorted(m.get("id", "") for m in r.json().get("data", []) if m.get("id"))
 
 
@@ -211,7 +215,7 @@ def _anthropic_chat(cfg, system, user, on_delta=None) -> str:
         buf = []
         with httpx.stream("POST", url, headers=headers, json=body, timeout=TIMEOUT) as r:
             if r.status_code != 200:
-                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code)}")
+                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code, cfg.get("language"))}")
             for line in r.iter_lines():
                 line = line.strip()
                 if not line.startswith("data:"):
@@ -229,7 +233,7 @@ def _anthropic_chat(cfg, system, user, on_delta=None) -> str:
         return "".join(buf)
     r = httpx.post(url, headers=headers, json=body, timeout=TIMEOUT)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code, cfg.get("language"))}")
     return "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
 
 
@@ -237,7 +241,7 @@ def _anthropic_models(cfg) -> list[str]:
     r = httpx.get(cfg["base_url"].rstrip("/") + "/v1/models",
                   headers={"x-api-key": cfg.get("api_key", ""), "anthropic-version": "2023-06-01", **UA}, timeout=30)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code, cfg.get("language"))}")
     return sorted(m.get("id", "") for m in r.json().get("data", []) if m.get("id"))
 
 
@@ -264,7 +268,7 @@ def _google_chat(cfg, system, user, on_delta=None) -> str:
                           headers=headers, json=_google_body(system, user, cfg.get("temperature", 0.9)),
                           timeout=TIMEOUT) as r:
             if r.status_code != 200:
-                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code)}")
+                raise LLMError(f"HTTP {r.status_code}: {r.read().decode('utf-8', 'replace')[:300]} {_hint(r.status_code, cfg.get("language"))}")
             for line in r.iter_lines():
                 line = line.strip()
                 if not line.startswith("data:"):
@@ -282,7 +286,7 @@ def _google_chat(cfg, system, user, on_delta=None) -> str:
     r = httpx.post(_google_url(cfg, "generateContent"), headers=headers,
                    json=_google_body(system, user, cfg.get("temperature", 0.9)), timeout=TIMEOUT)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:300]} {_hint(r.status_code, cfg.get("language"))}")
     parts = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
     return "".join(p.get("text", "") for p in parts)
 
@@ -291,7 +295,7 @@ def _google_models(cfg) -> list[str]:
     r = httpx.get(f"{cfg['base_url'].rstrip('/')}/v1beta/models?key={cfg.get('api_key','')}",
                   headers=UA, timeout=30)
     if r.status_code != 200:
-        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code)}")
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:200]} {_hint(r.status_code, cfg.get("language"))}")
     return sorted(m["name"].split("/")[-1] for m in r.json().get("models", []) if m.get("name"))
 
 
@@ -388,4 +392,7 @@ def complete_turn_json(cfg: dict, system: str, user: str, max_repairs: int = 2) 
             obj.setdefault("_raw", raw)
             return obj
         last_err = err
+    if cfg.get("language") == "en":
+        raise LLMError(f"The model never produced a valid turn JSON ({last_err}). "
+                       "Type anything to retry, or /config to switch models.")
     raise LLMError(f"模型输出始终不是合法的回合 JSON（{last_err}）。可输入任意内容重试，或 /config 换模型。")

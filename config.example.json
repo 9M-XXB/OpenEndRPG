@@ -4,5 +4,6 @@
   "base_url": "https://api.deepseek.com/v1",
   "api_key": "sk-在此填入你的key",
   "model": "deepseek-chat",
-  "temperature": 0.9
+  "temperature": 0.9,
+  "language": "zh"
 }

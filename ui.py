@@ -96,7 +96,10 @@ class UI:
     def suggestions(self, items: list[str]):
         if not items:
             return
-        self.muted("—— 下一步建议（可输入序号直取，也可自由输入任何行动）——")
+        if self.language == "en":
+            self.muted("—— Next-step suggestions (type a number to pick one, or type anything else) ——")
+        else:
+            self.muted("—— 下一步建议（可输入序号直取，也可自由输入任何行动）——")
         for i, s in enumerate(items, 1):
             self._print(f"  {i}. {s}")
 
@@ -109,7 +112,10 @@ class UI:
 
     def prompt(self, text: str = " you > ") -> str:
         try:
-            return input(text if self.plain else "\033[36m你 ›\033[0m ")
+            if self.plain:
+                return input(text)
+            label = "you ›" if self.language == "en" else "你 ›"
+            return input(f"\033[36m{label}\033[0m ")
         except (EOFError, KeyboardInterrupt):
             print()
             return "/quit"
