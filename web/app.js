@@ -20,7 +20,7 @@
   var STR = {
     zh: {
       brand: "完全开放式RPG", docTitle: "完全开放式RPG · 字画",
-      langTip: "切换界面与游戏语言",
+      langTip: "切换界面与游戏语言", langAria: "语言",
       navLedger: "账本", navHistory: "历史",
       lobbySub: "一个\"只提供开头\"的文字冒险——任务、NPC、画面，其余一切由 LLM 即时生成",
       notConfigured: "未配置", cfgCurrent: "当前：{p} / {m}",
@@ -59,7 +59,7 @@
     },
     en: {
       brand: "OpenEndRPG", docTitle: "OpenEndRPG · Glyph Slides",
-      langTip: "Switch UI & game language",
+      langTip: "Switch UI & game language", langAria: "Language",
       navLedger: "Ledger", navHistory: "History",
       lobbySub: "A text adventure that \"only provides a beginning\" — quests, NPCs, scenes: everything else is generated on the fly by an LLM",
       notConfigured: "Not configured", cfgCurrent: "Current: {p} / {m}",

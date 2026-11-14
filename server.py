@@ -153,14 +153,14 @@ class GameServer:
         return {"ok": True, "reply": (reply or "")[:80]}
 
     def api_config_save(self, body: dict) -> dict:
-        # 仅语言的更新(右上角切换): 合并进现有配置, 不触碰服务商/模型
+        # 仅语言的更新(右上角切换): 原地改配置(对局 engine.cfg 是同一引用, 立即生效), 不触碰服务商/模型
         if body.get("language") in ("zh", "en") and not body.get("provider"):
-            cfg = dict(self.cfg)
-            cfg["language"] = body["language"]
+            self.cfg["language"] = body["language"]
             from rpg import save_config
-            save_config(cfg)
-            self.cfg = cfg
-            return {"ok": True, "config": _public_config(cfg)}
+            save_config(self.cfg)
+            if self.game is not None:  # 游戏内切换: 服务端事件文案(回合头/骰提示)一并跟随
+                self.game.ui.language = body["language"]
+            return {"ok": True, "config": _public_config(self.cfg)}
         cfg = _draft_cfg(body)
         if not cfg["provider"]:
             return {"ok": False, "message": self._t("provider 不能为空", "provider is required")}
@@ -176,6 +176,8 @@ class GameServer:
         from rpg import save_config  # 惰性导入, 避免循环依赖
         save_config(cfg)
         self.cfg = cfg
+        if self.game is not None:
+            self.game.cfg = cfg  # 对局引用同步: 下一回合即用新配置(含语言)
         return {"ok": True, "config": _public_config(cfg)}
 
     def api_shutdown(self) -> dict:
@@ -203,7 +205,8 @@ class GameServer:
                     "suggestions": t.get("suggestions", []),
                     "dice": {"roll": t.get("dice"), "label": label}}
         elif save["turn"] == 0:
-            last = {"turn": 0, "player": "", "narrative": prompts.opening_text(save.get("language", "zh")),
+            last = {"turn": 0, "player": "",
+                    "narrative": prompts.opening_text(self.cfg.get("language", save.get("language", "zh"))),
                     "suggestions": [], "dice": None}
         return {
             "ok": True,
