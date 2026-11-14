@@ -10,8 +10,9 @@ import time
 class UI:
     """rich 模式默认; --plain 时降级为纯 print"""
 
-    def __init__(self, plain: bool = False):
+    def __init__(self, plain: bool = False, language: str = "zh"):
         self.plain = plain
+        self.language = language if language in ("zh", "en") else "zh"
         if not plain:
             try:
                 from rich.console import Console
@@ -59,7 +60,11 @@ class UI:
             self.console.rule(style="dim")
 
     def turn_header(self, day: int, period: str, location: str, turn: int):
-        line = f"第{day}天 · {period} · {location}    （回合 {turn}）"
+        import prompts
+        if self.language == "en":
+            line = f"Day {day} · {prompts.period_label(period, 'en')} · {location}    (turn {turn})"
+        else:
+            line = f"第{day}天 · {period} · {location}    （回合 {turn}）"
         if self.plain:
             print("\n" + "-" * 56 + "\n" + line + "\n" + "-" * 56)
         else:
@@ -96,7 +101,8 @@ class UI:
             self._print(f"  {i}. {s}")
 
     def dice_hidden(self):
-        self.muted("🎲 命运骰已掷下……")
+        self.muted("🎲 The fate die has been cast..."
+                   if self.language == "en" else "🎲 命运骰已掷下……")
 
     def dice_reveal(self, line: str):
         self.accent("🎲 " + line)

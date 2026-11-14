@@ -9,7 +9,8 @@ engine/llm/state 无需感知 Web 的存在 (规划.md §3)。
 class CollectingUI:
     """收集版渲染器: server 每次请求前清空 events, 回合/命令结束后整包返回"""
 
-    def __init__(self):
+    def __init__(self, language: str = "zh"):
+        self.language = language if language in ("zh", "en") else "zh"
         self.events: list[dict] = []
 
     def _add(self, kind: str, text: str = ""):
@@ -42,7 +43,12 @@ class CollectingUI:
         pass  # 纯排版分隔, Web 端不需要
 
     def turn_header(self, day: int, period: str, location: str, turn: int):
-        self._add("header", f"第{day}天 · {period} · {location} · 回合{turn}")
+        import prompts
+        if self.language == "en":
+            line = f"Day {day} · {prompts.period_label(period, 'en')} · {location} · Turn {turn}"
+        else:
+            line = f"第{day}天 · {period} · {location} · 回合{turn}"
+        self._add("header", line)
 
     def narrative(self, text: str, typewriter: bool = True):
         self._add("narrative", text)
@@ -53,7 +59,8 @@ class CollectingUI:
             self.events.append({"k": "suggestions", "items": items})
 
     def dice_hidden(self):
-        self._add("muted", "🎲 命运骰已掷下……")
+        self._add("muted", "🎲 The fate die has been cast..."
+                  if self.language == "en" else "🎲 命运骰已掷下……")
 
     def dice_reveal(self, line: str):
         self._add("dice", line)

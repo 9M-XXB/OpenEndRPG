@@ -29,14 +29,18 @@ class Game:
         self.snapshot = None
 
     # ---------- 主循环 ----------
+    def lang(self) -> str:
+        return self.save.get("language", "zh")
+
     def run(self):
+        lang = self.lang()
         if not self.save["history"]:  # 新档: 播放开场
             self.ui.title("完全开放式RPG ——" f"{self.save['name']}（主角:{self.save['hero']}）")
-            self.ui.narrative(prompts.OPENING_TEXT, typewriter=False)
+            self.ui.narrative(prompts.opening_text(lang), typewriter=False)
             self.ui.muted("（输入 /help 查看命令；其余任何输入都是你的行动）")
         else:
             s = self.save["state"]
-            self.ui.info(f"欢迎回来，{self.save['hero']}。剧情回到第{s['day']}天·{s['period']}，请继续。")
+            self.ui.info(f"欢迎回来，{self.save['hero']}。剧情回到第{s['day']}天·{prompts.period_label(s['period'], lang)}，请继续。")
         while True:
             s = self.save["state"]  # 每轮现取: /reroll 会整体替换 state 对象
             self.ui.turn_header(s["day"], s["period"], s["location"], self.save["turn"])
@@ -60,14 +64,15 @@ class Game:
 
     # ---------- 一个回合 ----------
     def turn(self, player_input: str) -> bool:
+        lang = self.lang()
         self.last_input = player_input
         self.snapshot = copy.deepcopy(self.save)  # /reroll 用
-        _, dice = prompts.roll_dice()
+        _, dice = prompts.roll_dice(lang)
         self.ui.dice_hidden()
         spin = self.ui.spinner("世界正在推演")
         try:
-            system = prompts.SYSTEM_RULES.replace("{hero}", self.save["hero"])
-            user = prompts.build_turn_prompt(self.save, player_input, dice)
+            system = prompts.system_rules(self.save["hero"], lang)
+            user = prompts.build_turn_prompt(self.save, player_input, dice, lang)
             obj = llm.complete_turn_json(self.cfg, system, user)
         except llm.LLMError as e:
             self.ui.error(f"生成失败：{e}")
@@ -120,7 +125,8 @@ class Game:
             log = self.save.get("dice_log", [])
             if log:
                 last = log[-1]
-                self.ui.dice_reveal(f"回合 {last['turn']}：点数 {last['roll']}/20 · {last['label']}")
+                self.ui.dice_reveal(prompts.turn_dice_line(
+                    last["turn"], last["roll"], last.get("label", ""), self.lang()))
             else:
                 self.ui.info("还没有掷过骰。")
         elif cmd == "/suggestions":

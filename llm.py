@@ -9,7 +9,7 @@ import os
 
 import httpx
 
-from prompts import canvas
+from prompts import PERIOD_EN, SWORD_GLYPHS, glyphs, slide
 
 TIMEOUT = httpx.Timeout(20.0, read=300.0)
 UA = {"User-Agent": "open-rpg-terminal/0.1"}
@@ -60,7 +60,7 @@ class _Mock:
     calls = 0
     PERIOD_FLOW = ["上午", "下午", "傍晚", "夜晚", "清晨"]
 
-    def _template(self, user: str, corrupt: bool) -> str:
+    def _template(self, user: str, corrupt: bool, language: str) -> str:
         self.calls += 1
         if corrupt:
             return "抱歉，我无法以 JSON 以外的格式思考……{这不是合法JSON"
@@ -68,60 +68,80 @@ class _Mock:
         action = user
         if "【玩家行动】" in user:
             action = user.split("【玩家行动】", 1)[1].split("\n", 1)[0]
+        en = language == "en"
         p = self.PERIOD_FLOW[(self.calls - 1) % 5]
-        days = 3 if "三天后" in action else 0
-        col = 2 + ((self.calls - 1) % 3) * 2  # 「我」每回合向右挪 2 格, 验证平滑切换
-        slide_move = {
-            "caption": "北上赶路", "tone": "灰",
-            "canvas": canvas(
-                "",
-                "　山　　　山　　山",
-                "　　丶　　　　丶",
-                "",
-                "",
-                "　" * col + "我",
-            ),
-        }
-        slide_chest = {
-            "caption": "发现铜哨", "tone": "暖",
-            "canvas": canvas(
-                "",
-                "",
-                "　　　┌──┐",
-                "　　　│宝箱│",
-                "　　　└──┘",
-                "　我",
-            ),
-        }
+        days_kw = ("三天后" in action
+                   or "three days later" in action.lower()
+                   or "3 days later" in action.lower())
+        days = 3 if days_kw else 0
+        hx = 10 + ((self.calls - 1) % 3) * 16  # 「我」每回合右移 16 舞台单位, 验证平滑切换
+        # 字画 glyphs (规划.md 第五轮): zh 两镜沿用 v0.2 内容换算为 glyphs; en 输出 sword 字母剑
+        slide_move = slide("北上赶路" if not en else "heading north", "灰", glyphs(
+            ("山", 15, 26, 2), ("山", 45, 20, 3), ("山", 76, 30, 2),
+            ("丶", 30, 55, 1), ("丶", 62, 50, 1),
+            ("我", hx, 88, 5),
+        ))
+        slide_chest = slide("发现铜哨" if not en else "a brass whistle", "暖", glyphs(
+            ("┌", 29, 42, 3), ("─", 38, 42, 3), ("─", 46, 42, 3), ("┐", 54, 42, 3),
+            ("│", 29, 58, 3), ("宝", 38, 58, 4), ("箱", 46, 58, 4), ("│", 54, 58, 3),
+            ("└", 29, 74, 3), ("─", 38, 74, 3), ("─", 46, 74, 3), ("┘", 54, 74, 3),
+            ("我", 8, 92, 5),
+        ))
+        slide_sword = slide("the ancestral sword", "暗", [dict(g) for g in SWORD_GLYPHS])
+        slides = [slide_sword, slide_move] if en else [slide_move, slide_chest]
         import json as _j
         # NPC 常驻演示: 奇数回合遇见信使(写账本), 偶数回合不更新——
-        # 若偶数回合恰逢"三天后", 下回合的账本里信使就会显示"距今3天", 演练重逢注入
+        # 若偶数回合恰逢跳三天, 下回合的账本里信使就会显示"距今3天", 演练重逢注入
         met = self.calls % 2 == 1
-        upserts = [{"name": "神秘信使", "status": "快马北去", "relation": "陌生",
-                    "location": "北方官道", "note": f"第{self.calls}次出现"}] if met else []
-        aside = ("那名神秘信使竟已在茶棚等候多时——他说北边的界碑又烧了一处。"
-                 if met else "茶棚里只有往来的行脚商人，没有熟面孔。")
-        return _j.dumps({
-            "narrative": f"【Mock 测试剧情 #{self.calls}】世界回应了你的行动：「{action[:60]}」。"
+        if en:
+            upserts = [{"name": "the courier", "status": "riding north in haste", "relation": "stranger",
+                        "location": "the north road", "note": f"appearance #{self.calls}"}] if met else []
+            aside = ("The mysterious courier is already waiting at the tea shed — another boundary stone "
+                     "up north has been burned, he says."
+                     if met else "The tea shed holds only traveling peddlers; no familiar faces.")
+            narrative = (f"[Mock test turn #{self.calls}] The world answers your action: \"{action[:60]}\". "
+                         f"Dust rises on the mountain road far away; {aside}"
+                         + (f" You press on for three days and nights, " if days else " Time drifts, ")
+                         + f"and it is {PERIOD_EN.get(p, p)} before you know it.")
+            summary = (f"(summary updated to turn {self.calls}) The hero travels north amid warnings "
+                       f"from the border; a mysterious courier keeps reappearing.")
+            sugg = ["Ask the tea-shed keeper about the courier", "Examine the etchings on the brass whistle",
+                    "Keep heading north"]
+            location = "the tea shed by the north road"
+            facts = [f"test fact #{self.calls}: the northern border alerts again"]
+            items = [f"brass whistle dropped by the courier #{self.calls}"] if met else []
+        else:
+            upserts = [{"name": "神秘信使", "status": "快马北去", "relation": "陌生",
+                        "location": "北方官道", "note": f"第{self.calls}次出现"}] if met else []
+            aside = ("那名神秘信使竟已在茶棚等候多时——他说北边的界碑又烧了一处。"
+                     if met else "茶棚里只有往来的行脚商人，没有熟面孔。")
+            narrative = (f"【Mock 测试剧情 #{self.calls}】世界回应了你的行动：「{action[:60]}」。"
                          f"远处的山道上扬起尘土，{aside}"
-                         + (f"你日夜兼程三天，" if days else "时间流逝，") + f"转眼到了{p}。",
-            "slides": [slide_move, slide_chest],
+                         + (f"你日夜兼程三天，" if days else "时间流逝，") + f"转眼到了{p}。")
+            summary = f"（摘要更新到第{self.calls}回合）主角一路北上，途中屡遇北境警讯，神秘信使反复出现。"
+            sugg = ["追问茶棚老板信使的来历", "检查铜哨上的刻痕", "继续向北赶路"]
+            location = "官道旁的茶棚"
+            facts = [f"测试事实#{self.calls}：北境警讯再传"]
+            items = [f"信使掉落的铜哨#{self.calls}"] if met else []
+        return _j.dumps({
+            "narrative": narrative,
+            "slides": slides,
             "time_advance": {"days": days, "period": p},
             "state_updates": {
-                "facts_add": [f"测试事实#{self.calls}：北境警讯再传"],
+                "facts_add": facts,
                 "facts_remove": [],
                 "npc_upserts": upserts,
-                "items_add": [f"信使掉落的铜哨#{self.calls}"] if met else [],
-                "location": "官道旁的茶棚",
+                "items_add": items,
+                "location": location,
             },
-            "summary": f"（摘要更新到第{self.calls}回合）主角一路北上，途中屡遇北境警讯，神秘信使反复出现。",
-            "suggestions": ["追问茶棚老板信使的来历", "检查铜哨上的刻痕", "继续向北赶路"],
+            "summary": summary,
+            "suggestions": sugg,
         }, ensure_ascii=False)
 
     def chat(self, cfg, system, user, on_delta=None) -> str:
         action = user.split("【玩家行动】", 1)[1] if "【玩家行动】" in user else user
         corrupt = "[ corrupt ]" in action and "修复请求" not in user
-        text = self._template(user, corrupt)
+        text = self._template(user, corrupt, cfg.get("language", "zh"))
         if on_delta:
             for ch in text:
                 on_delta(ch)

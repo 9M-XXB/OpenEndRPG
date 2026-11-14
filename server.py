@@ -46,7 +46,8 @@ def _public_config(cfg: dict) -> dict:
             "provider": (cfg or {}).get("provider", ""),
             "model": (cfg or {}).get("model", ""),
             "base_url": (cfg or {}).get("base_url", ""),
-            "api_key_set": bool((cfg or {}).get("api_key"))}
+            "api_key_set": bool((cfg or {}).get("api_key")),
+            "language": (cfg or {}).get("language", "zh")}
 
 
 def _providers_public() -> list[dict]:
@@ -64,7 +65,8 @@ def _draft_cfg(partial: dict) -> dict:
            "temperature": 0.9,
            "api_key": str(partial.get("api_key", "")).strip(),
            "base_url": str(partial.get("base_url", "")).strip(),
-           "model": str(partial.get("model", "")).strip()}
+           "model": str(partial.get("model", "")).strip(),
+           "language": partial.get("language") if partial.get("language") in ("zh", "en") else "zh"}
     if cfg["provider"] == "mock":
         cfg.update(base_url="mock://local", model="mock-mini", api_key="")
         return cfg
@@ -97,7 +99,7 @@ class GameServer:
             return {"ok": False, "message": "存档名不能为空"}
         with self.lock:
             try:
-                save = st.new_save(name, hero)
+                save = st.new_save(name, hero, self.cfg.get("language", "zh"))
                 st.save_game(save)
             except st.SaveError as e:
                 return {"ok": False, "message": str(e)}
@@ -116,7 +118,8 @@ class GameServer:
                 save = st.load_save((name or "").strip())
             except st.SaveError as e:
                 return {"ok": False, "message": str(e)}
-            self.game = engine.Game(save, self.cfg, CollectingUI())
+            self.game = engine.Game(save, self.cfg,
+                                    CollectingUI(save.get("language", self.cfg.get("language", "zh"))))
         return {"ok": True}
 
     def api_config_get(self) -> dict:
@@ -182,15 +185,17 @@ class GameServer:
                     "suggestions": t.get("suggestions", []),
                     "dice": {"roll": t.get("dice"), "label": label}}
         elif save["turn"] == 0:
-            last = {"turn": 0, "player": "", "narrative": prompts.OPENING_TEXT,
+            last = {"turn": 0, "player": "", "narrative": prompts.opening_text(save.get("language", "zh")),
                     "suggestions": [], "dice": None}
         return {
             "ok": True,
             "in_game": True,
-            "meta": {"name": save["name"], "hero": save["hero"],
+            "meta": {"name": save["name"], "hero": save["hero"], "language": save.get("language", "zh"),
                      "day": s["day"], "period": s["period"], "location": s["location"],
                      "turn": save["turn"], "provider": save.get("provider", {})},
-            "canvas": {"w": prompts.CANVAS_W, "h": prompts.CANVAS_H, "tones": prompts.TONES},
+            "stage_spec": {"coords": prompts.STAGE_COORDS, "smin": prompts.S_MIN, "smax": prompts.S_MAX,
+                           "rmax": prompts.R_MAX, "max_glyphs": prompts.GLYPHS_MAX,
+                           "tones": prompts.TONES, "aspect": "12 / 7"},
             "stage": save.get("stage", []),
             "last": last,
             "history_tail": [{"turn": t.get("turn"), "player": t.get("player"),

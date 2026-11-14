@@ -19,21 +19,24 @@ class SaveError(Exception):
     pass
 
 
-def new_save(name: str, hero: str) -> dict:
-    from prompts import OPENING_STATE, OPENING_SLIDE
+def new_save(name: str, hero: str, language: str = "zh") -> dict:
+    from prompts import LANGUAGES, opening_slide, opening_state
+    language = language if language in LANGUAGES else "zh"
+    opening = opening_state(language)
     now = datetime.now().isoformat(timespec="seconds")
     return {
         "version": SAVE_VERSION,
         "name": name,
         "hero": hero or "勇者",
+        "language": language,
         "created_at": now,
         "updated_at": now,
         "turn": 0,
-        "state": copy.deepcopy(OPENING_STATE),
-        "summary": OPENING_STATE["summary"],
+        "state": opening,
+        "summary": opening["summary"],
         "history": [],
         "dice_log": [],
-        "stage": [copy.deepcopy(OPENING_SLIDE)],
+        "stage": [opening_slide(language)],
         "provider": {},
     }
 

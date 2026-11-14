@@ -11,6 +11,14 @@
   var meta = {};
   var providers = [];
   var gameBound = false;
+  var PERIOD_EN = { "清晨": "dawn", "上午": "morning", "下午": "afternoon", "傍晚": "evening", "夜晚": "night" };
+
+  function lang() { return meta.language === "en" ? "en" : "zh"; }
+  function periodLabel(p) { return lang() === "en" ? (PERIOD_EN[p] || p) : p; }
+  function dayLabel(day, period) {
+    return lang() === "en" ? "Day " + day + " · " + periodLabel(period)
+                           : "第" + day + "天·" + period;
+  }
 
   // 故事分页状态
   var pages = [];
@@ -94,6 +102,7 @@
     providers.forEach(function (p) { sel.appendChild(new Option(p.name, p.id)); });
     sel.value = cfg.config.provider || "mock";
     onProviderChange();
+    $("#cfg-language").value = cfg.config.language === "en" ? "en" : "zh";
     $("#cfg-base").value = cfg.config.base_url || "";
     $("#cfg-key").value = "";
     $("#cfg-key").placeholder = cfg.config.api_key_set
@@ -108,7 +117,8 @@
     return { provider: $("#cfg-provider").value,
              base_url: $("#cfg-base").value.trim(),
              api_key: $("#cfg-key").value,
-             model: $("#cfg-model").value.trim() };
+             model: $("#cfg-model").value.trim(),
+             language: $("#cfg-language").value };
   }
 
   function cfgMsg(text, isError) {
@@ -180,7 +190,7 @@
     var prov = meta.provider || {};
     $("#meta").textContent =
       "存档「" + (meta.name || "—") + "」 主角:" + (meta.hero || "—") +
-      " · 第" + s.day + "天·" + s.period + " · " + s.location +
+      " · " + dayLabel(s.day, s.period) + " · " + s.location +
       " · 回合" + s.turn +
       (prov.provider ? " · " + prov.provider + "/" + prov.model : "");
   }
@@ -320,14 +330,15 @@
       dots.appendChild(el("span", "dot" + (i === idx ? " on" : "")));
     }
     if (idx < 0) {
-      $("#slide-caption").textContent = "（暂无画面——剧情继续中）";
+      $("#slide-caption").textContent = lang() === "en"
+        ? "(no slide yet — the story goes on)" : "（暂无画面——剧情继续中）";
       return;
     }
     var s = meta.state || meta;
     var parts = [];
     if (caption) parts.push(caption);
     if (tone) parts.push(tone + "色调");
-    if (s.day != null) parts.push("第" + s.day + "天·" + s.period + " · " + s.location);
+    if (s.day != null) parts.push(dayLabel(s.day, s.period) + " · " + s.location);
     if (total > 1) parts.push((idx + 1) + "/" + total);
     $("#slide-caption").textContent = parts.join(" · ");
   }
@@ -382,10 +393,10 @@
     $("#meta").textContent = "";
     if (!gameBound) {
       gameBound = true;
-      var cfg = state.canvas || { w: 12, h: 6, tones: ["灰"] };
+      var spec = state.stage_spec || { tones: ["灰"], aspect: "12 / 7" };
       stage = SlideEngine.createStage($("#stage"), {
-        W: cfg.w, H: cfg.h, tones: cfg.tones,
-        aspect: cfg.w + " / " + Math.round(cfg.h * 1.2),
+        tones: spec.tones,
+        aspect: spec.aspect || "12 / 7",
         onSlide: updateSlide
       });
       $("#input-form").addEventListener("submit", function (ev) {

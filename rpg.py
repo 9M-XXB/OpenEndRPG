@@ -42,6 +42,8 @@ def load_config() -> dict | None:
     if not cfg.get("provider") or not cfg.get("protocol"):
         return None
     cfg.setdefault("temperature", 0.9)
+    if cfg.get("language") not in ("zh", "en"):
+        cfg["language"] = "zh"
     return cfg
 
 
@@ -85,11 +87,15 @@ def run_wizard(ui: UI) -> dict:
     ui.title("API 配置向导")
     ui.muted("本游戏兼容任何 OpenAI 格式的接口（含 Ollama/LM Studio 本地模型）；key 只保存在本机 config.json。")
 
+    lang_idx = _pick(ui, ["中文（简体）", "English"], "游戏语言 / Game language：")
+    language = ("zh", "en")[lang_idx]
+
     idx = _pick(ui, [p["name"] for p in llm.PROVIDERS], "选择服务商：")
     preset = llm.PROVIDERS[idx]
 
     cfg = {"provider": preset["id"], "protocol": preset["protocol"],
-           "temperature": 0.9, "api_key": "", "base_url": preset["base_url"], "model": preset["model"]}
+           "temperature": 0.9, "api_key": "", "base_url": preset["base_url"], "model": preset["model"],
+           "language": language}
 
     if preset["id"] == "mock":
         save_config(cfg)
@@ -179,7 +185,7 @@ def main_menu(ui: UI, cfg: dict):
                 continue
             hero = _ask(ui, "主角名", default="勇者")
             try:
-                save = st.new_save(name, hero)
+                save = st.new_save(name, hero, cfg.get("language", "zh"))
                 st.save_game(save)
             except st.SaveError as e:
                 ui.error(str(e))
@@ -242,16 +248,16 @@ def run_server(args, ui: UI, cfg: dict):
 
     game = None
     if args.new:
-        save = st.new_save(args.new, args.hero)
+        save = st.new_save(args.new, args.hero, cfg.get("language", "zh"))
         st.save_game(save)
-        game = engine.Game(save, cfg, CollectingUI())
+        game = engine.Game(save, cfg, CollectingUI(cfg.get("language", "zh")))
     elif args.save:
         try:
             save = st.load_save(args.save)
         except st.SaveError as e:
             ui.error(str(e))
             sys.exit(1)
-        game = engine.Game(save, cfg, CollectingUI())
+        game = engine.Game(save, cfg, CollectingUI(save.get("language", "zh")))
 
     port = _pick_port(args.host, args.port)
     if port != args.port:
@@ -294,8 +300,8 @@ def main():
     ap.add_argument("--plain", action="store_true", help="（仅终端模式）纯文本渲染")
     args = ap.parse_args()
 
-    ui = UI(plain=args.plain)
     cfg = load_config()
+    ui = UI(plain=args.plain, language=(cfg or {}).get("language", "zh"))
 
     if args.terminal:  # 终端模式: 菜单/命令行对话
         if args.cmd == "config" or cfg is None:
@@ -303,7 +309,7 @@ def main():
             if args.cmd == "config" and not args.save and not args.new:
                 return
         if args.new:
-            save = st.new_save(args.new, args.hero)
+            save = st.new_save(args.new, args.hero, cfg.get("language", "zh"))
             st.save_game(save)
             engine.Game(save, cfg, ui).run()
             return
