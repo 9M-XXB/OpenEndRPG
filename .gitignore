@@ -16,3 +16,9 @@ logs/
 .DS_Store
 .venv/
 venv/
+
+# 打包产物 — 本地留存, 不入库
+build/
+dist/
+release/
+OpenEndRPG.spec

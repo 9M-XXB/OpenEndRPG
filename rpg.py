@@ -16,16 +16,18 @@ import getpass
 import json
 import os
 import sys
+import threading
+import webbrowser
 
 import httpx
 
 import engine
 import llm
+import paths
 import state as st
 from ui import UI
 
-CODE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(CODE_DIR, "config.json")
+CONFIG_PATH = os.path.join(paths.app_dir(), "config.json")
 GAME_TITLE = "完全开放式RPG · 终端原型 v0.1"
 
 
@@ -268,11 +270,31 @@ def run_server(args, ui: UI, cfg: dict):
         ui.error(f"服务启动失败（{e}）")
         sys.exit(1)
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
-    ui.success(f"网页模式已启动：http://{shown_host}:{port}   （Ctrl+C 退出并自动存档）")
+    url = f"http://{shown_host}:{port}"
+    ui.success(f"网页模式已启动：{url}   （Ctrl+C 退出并自动存档）")
     if game is None:
         ui.info("启动到大厅页：在浏览器中新建存档、选择存档、配置 API 或退出。")
     if args.host == "0.0.0.0":
         ui.muted("已监听全部网卡，同一局域网的设备可用本机 IP 访问。")
+    # 打包(冻结)体验: 启动后自动打开系统浏览器; 大厅「退出」会关闭服务, 进程随之结束
+    if not getattr(args, "no_open", False):
+        threading.Timer(0.6, webbrowser.open, args=(url,)).start()
+
+    def _on_term(_sig, _frm):
+        # 双击版被结束(Cmd+Q/任务管理器)时尽力存档; 每回合本就自动存档
+        g = getattr(httpd.gameserver, "game", None)
+        if g is not None:
+            try:
+                st.save_game(g.save)
+            except Exception:
+                pass
+        os._exit(0)
+
+    import signal
+    try:
+        signal.signal(signal.SIGTERM, _on_term)
+    except (ValueError, OSError):
+        pass
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -298,6 +320,8 @@ def main():
     ap.add_argument("--new", metavar="存档名", help="直接新建指定存档")
     ap.add_argument("--hero", metavar="主角名", default="勇者")
     ap.add_argument("--plain", action="store_true", help="（仅终端模式）纯文本渲染")
+    ap.add_argument("--no-open", action="store_true",
+                    help="（网页模式）启动后不自动打开系统浏览器")
     args = ap.parse_args()
 
     cfg = load_config()
@@ -325,7 +349,8 @@ def main():
         return
 
     # 默认: 网页模式
-    if args.cmd == "config" or cfg is None:
+    if not paths.FROZEN and (args.cmd == "config" or cfg is None):
+        # 打包(冻结)版不进终端向导: 没有终端 stdin, 配置在大厅页内完成
         run_wizard(ui)
         if args.cmd == "config":
             return

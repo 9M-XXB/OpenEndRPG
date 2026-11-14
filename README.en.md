@@ -98,6 +98,15 @@ Per-turn flow: player input → deep-copy snapshot → roll the fate die → LLM
 - [ ] Persistent memory for key NPCs (memory stream + reflection), passers-by generated on the fly
 - [ ] Content admission pipeline (filter/rewrite loop) to hedge against low small-model task quality
 
+## Packaging (double-click desktop build)
+
+- **macOS**: `./build_mac.sh` produces `release/OpenEndRPG-mac.zip` — unzip and double-click `OpenEndRPG.app`; the browser opens the same lobby as web mode (first launch unpacks for a few seconds).
+- **Windows**: double-click `build_exe.bat` on any Windows machine (Python 3.10+ required) — it produces `release/OpenEndRPG-windows.zip` containing **OpenEndRPG.exe**; double-click to play. PyInstaller cannot cross-compile, so the exe must be built on Windows (the script makes it one click).
+- **First run**: the packaged app has no terminal wizard — with no API configured it goes straight to the lobby; set everything up in-browser via "Configure API" (配置 API), and turns submitted without a config get a friendly pointer instead of an error.
+- **Data location**: Windows = `config.json` and `saves/` next to the exe (portable); macOS = `~/Library/Application Support/OpenEndRPG/`.
+- **Quitting**: the lobby's exit button saves the game and shuts the server down (the process exits with it); killing the process also saves (every turn auto-saves anyway).
+- Implementation notes: `paths.py` frozen-aware paths (read-only front-end assets travel inside the bundle, writable data goes to a persistent location), a `--no-open` debug switch, and a SIGTERM save hook.
+
 ## Attribution
 
 Designed and written by ZCode (coding agent, model GLM-5.3-Flash), 2026-10. Philosophical next of kin: AI Dungeon, 1001 Nights, Generative Agents.

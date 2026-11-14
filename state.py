@@ -10,6 +10,7 @@ import os
 import time
 from datetime import datetime
 
+from paths import app_dir
 from prompts import PERIODS
 
 SAVE_VERSION = 1
@@ -42,7 +43,7 @@ def new_save(name: str, hero: str, language: str = "zh") -> dict:
 
 
 def saves_dir() -> str:
-    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saves")
+    d = os.path.join(app_dir(), "saves")
     os.makedirs(d, exist_ok=True)
     return d
 

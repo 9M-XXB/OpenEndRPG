@@ -98,6 +98,15 @@ OpenEndRPG/
 - [ ] 关键 NPC 常驻记忆（记忆流 + 反思），路人即席生成
 - [ ] 生成内容准入管线（筛选/重写循环），对冲小模型任务合格率低的问题
 
+## 打包（桌面双击版）
+
+- **macOS**：`./build_mac.sh` 产出 `release/OpenEndRPG-mac.zip`——解压后双击 `OpenEndRPG.app`，系统浏览器自动打开与网页模式完全一致的大厅（首次启动解压需数秒）；
+- **Windows**：在任意 Windows 机器上双击 `build_exe.bat`（需 Python 3.10+），产出 `release/OpenEndRPG-windows.zip`，内含 **OpenEndRPG.exe**——双击即玩。PyInstaller 不支持跨平台交叉打包，故 exe 须在 Windows 上构建（脚本已备好，一键完成）；
+- **首跑体验**：打包版没有终端向导——未配置时直达大厅，在浏览器内「配置 API」完成服务商/key 设置；回合前未配置会得到友好指引而非报错；
+- **数据位置**：Windows = exe 同目录的 `config.json` 与 `saves/`（绿色便携）；macOS = `~/Library/Application Support/OpenEndRPG/`；
+- **退出**：大厅左下「退出」按钮 = 存档并关闭服务（进程随之结束）；直接关闭/结束进程也会尽力存档（每回合本就自动存档）；
+- 实现要点：`paths.py` 冻结感知路径（只读前端资产随包、可写数据落持久目录）、`--no-open` 调试开关、SIGTERM 存档钩子。
+
 ## 归属
 
 由 ZCode（编码智能体，模型 GLM-5.3-Flash）设计与编写（2026-10）；产品哲学上的近亲：AI Dungeon、1001 Nights、Generative Agents。

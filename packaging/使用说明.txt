@@ -1,0 +1,40 @@
+OpenEndRPG — 使用说明 / Getting Started
+========================================
+
+【中文】
+这是什么：一个"只提供开头"的文字冒险游戏——剧情、任务、NPC、字画画面全部由 LLM 即时生成，
+完全本地运行，不上传任何数据。
+
+怎么开始（macOS）：
+1. 解压本压缩包，双击 OpenEndRPG.app；
+2. 系统浏览器会自动打开游戏大厅（首次启动解压需数秒，请稍候）；
+3. 首次使用：点「配置 API」选择服务商并填入 API key（只保存在本机），然后「新建存档」即可开玩；
+4. 界面右上角可随时切换 中文 / English（界面与剧情语言一并切换）；
+5. 结束游玩：点大厅左下「退出（存档并关闭服务）」，程序自动存档并退出。
+
+数据位置：config.json 与存档位于
+  ~/Library/Application Support/OpenEndRPG/
+删除该文件夹即彻底重置；游戏本体不联网（仅访问你配置的 LLM API）。
+
+注意：本包为 macOS (Apple Silicon / Intel 通用) 版本。Windows 版请在 Windows 机器上
+用仓库 code/build_exe.bat 一键构建（得到 OpenEndRPG.exe）。
+
+[English]
+What it is: a text adventure that "only provides a beginning" — story, quests, NPCs and
+glyph-slide scenes are all generated on the fly by an LLM. Fully local; nothing is uploaded
+except calls to the LLM API you configure.
+
+How to start (macOS):
+1. Unzip and double-click OpenEndRPG.app;
+2. Your browser opens the game lobby automatically (first launch unpacks for a few seconds);
+3. First time: click "Configure API" (labelled 配置 API) to pick a provider and enter your API
+   key (stored locally only), then "New save" (新建存档) to play;
+4. Switch 中文 / English any time from the top-right corner (UI + story language together);
+5. To quit: the lobby's bottom-left exit button saves the game and shuts the app down.
+
+Data location: config.json and saves live in
+  ~/Library/Application Support/OpenEndRPG/
+Delete that folder to reset completely. The app itself never phones home.
+
+Note: this bundle is the macOS build. For Windows, run code/build_exe.bat from the repository
+on any Windows machine — it produces the same package with OpenEndRPG.exe inside.

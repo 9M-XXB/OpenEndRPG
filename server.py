@@ -26,12 +26,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import engine
 import llm
+import paths
 import prompts
 import state as st
 from webui import CollectingUI
 
-WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+WEB_DIR = os.path.join(paths.bundle_dir(), "web")
+CONFIG_PATH = os.path.join(paths.app_dir(), "config.json")
 STATIC_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -229,6 +230,12 @@ class GameServer:
         if self.game is None:
             return {"ok": False, "kind": "error",
                     "message": self._t("尚未进入存档", "No save is active")}
+        if not self.cfg.get("provider"):
+            # 打包版可先建存档后配置: 未配置时回合给友好指引而非报错堆栈
+            return {"ok": False, "kind": "error",
+                    "message": self._t("尚未配置 API——请先回到大厅使用「配置 API」。",
+                                       "No API configured yet — set it up via \"Configure API\" "
+                                       "in the lobby first.")}
         text = (text or "").strip()
         if not text:
             return {"ok": False, "kind": "error", "message": self._t("输入为空", "Empty input")}
@@ -367,6 +374,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve(cfg: dict, game=None, host: str = "127.0.0.1", port: int = 8770) -> ThreadingHTTPServer:
+    # 打包版可在未配置时直达大厅(浏览器内完成配置), 故允许 cfg 为空
+    cfg = cfg if isinstance(cfg, dict) else {"language": "zh"}
     httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.gameserver = GameServer(cfg, game=game, on_shutdown=httpd.shutdown)
     return httpd
